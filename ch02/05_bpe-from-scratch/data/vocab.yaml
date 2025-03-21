@@ -1,0 +1,1000 @@
+0: !!binary |
+  AA==
+1: !!binary |
+  AQ==
+2: !!binary |
+  Ag==
+3: !!binary |
+  Aw==
+4: !!binary |
+  BA==
+5: !!binary |
+  BQ==
+6: !!binary |
+  Bg==
+7: !!binary |
+  Bw==
+8: !!binary |
+  CA==
+9: !!binary |
+  CQ==
+10: !!binary |
+  Cg==
+11: !!binary |
+  Cw==
+12: !!binary |
+  DA==
+13: !!binary |
+  DQ==
+14: !!binary |
+  Dg==
+15: !!binary |
+  Dw==
+16: !!binary |
+  EA==
+17: !!binary |
+  EQ==
+18: !!binary |
+  Eg==
+19: !!binary |
+  Ew==
+20: !!binary |
+  FA==
+21: !!binary |
+  FQ==
+22: !!binary |
+  Fg==
+23: !!binary |
+  Fw==
+24: !!binary |
+  GA==
+25: !!binary |
+  GQ==
+26: !!binary |
+  Gg==
+27: !!binary |
+  Gw==
+28: !!binary |
+  HA==
+29: !!binary |
+  HQ==
+30: !!binary |
+  Hg==
+31: !!binary |
+  Hw==
+32: !!binary |
+  IA==
+33: !!binary |
+  IQ==
+34: !!binary |
+  Ig==
+35: !!binary |
+  Iw==
+36: !!binary |
+  JA==
+37: !!binary |
+  JQ==
+38: !!binary |
+  Jg==
+39: !!binary |
+  Jw==
+40: !!binary |
+  KA==
+41: !!binary |
+  KQ==
+42: !!binary |
+  Kg==
+43: !!binary |
+  Kw==
+44: !!binary |
+  LA==
+45: !!binary |
+  LQ==
+46: !!binary |
+  Lg==
+47: !!binary |
+  Lw==
+48: !!binary |
+  MA==
+49: !!binary |
+  MQ==
+50: !!binary |
+  Mg==
+51: !!binary |
+  Mw==
+52: !!binary |
+  NA==
+53: !!binary |
+  NQ==
+54: !!binary |
+  Ng==
+55: !!binary |
+  Nw==
+56: !!binary |
+  OA==
+57: !!binary |
+  OQ==
+58: !!binary |
+  Og==
+59: !!binary |
+  Ow==
+60: !!binary |
+  PA==
+61: !!binary |
+  PQ==
+62: !!binary |
+  Pg==
+63: !!binary |
+  Pw==
+64: !!binary |
+  QA==
+65: !!binary |
+  QQ==
+66: !!binary |
+  Qg==
+67: !!binary |
+  Qw==
+68: !!binary |
+  RA==
+69: !!binary |
+  RQ==
+70: !!binary |
+  Rg==
+71: !!binary |
+  Rw==
+72: !!binary |
+  SA==
+73: !!binary |
+  SQ==
+74: !!binary |
+  Sg==
+75: !!binary |
+  Sw==
+76: !!binary |
+  TA==
+77: !!binary |
+  TQ==
+78: !!binary |
+  Tg==
+79: !!binary |
+  Tw==
+80: !!binary |
+  UA==
+81: !!binary |
+  UQ==
+82: !!binary |
+  Ug==
+83: !!binary |
+  Uw==
+84: !!binary |
+  VA==
+85: !!binary |
+  VQ==
+86: !!binary |
+  Vg==
+87: !!binary |
+  Vw==
+88: !!binary |
+  WA==
+89: !!binary |
+  WQ==
+90: !!binary |
+  Wg==
+91: !!binary |
+  Ww==
+92: !!binary |
+  XA==
+93: !!binary |
+  XQ==
+94: !!binary |
+  Xg==
+95: !!binary |
+  Xw==
+96: !!binary |
+  YA==
+97: !!binary |
+  YQ==
+98: !!binary |
+  Yg==
+99: !!binary |
+  Yw==
+100: !!binary |
+  ZA==
+101: !!binary |
+  ZQ==
+102: !!binary |
+  Zg==
+103: !!binary |
+  Zw==
+104: !!binary |
+  aA==
+105: !!binary |
+  aQ==
+106: !!binary |
+  ag==
+107: !!binary |
+  aw==
+108: !!binary |
+  bA==
+109: !!binary |
+  bQ==
+110: !!binary |
+  bg==
+111: !!binary |
+  bw==
+112: !!binary |
+  cA==
+113: !!binary |
+  cQ==
+114: !!binary |
+  cg==
+115: !!binary |
+  cw==
+116: !!binary |
+  dA==
+117: !!binary |
+  dQ==
+118: !!binary |
+  dg==
+119: !!binary |
+  dw==
+120: !!binary |
+  eA==
+121: !!binary |
+  eQ==
+122: !!binary |
+  eg==
+123: !!binary |
+  ew==
+124: !!binary |
+  fA==
+125: !!binary |
+  fQ==
+126: !!binary |
+  fg==
+127: !!binary |
+  fw==
+128: !!binary |
+  gA==
+129: !!binary |
+  gQ==
+130: !!binary |
+  gg==
+131: !!binary |
+  gw==
+132: !!binary |
+  hA==
+133: !!binary |
+  hQ==
+134: !!binary |
+  hg==
+135: !!binary |
+  hw==
+136: !!binary |
+  iA==
+137: !!binary |
+  iQ==
+138: !!binary |
+  ig==
+139: !!binary |
+  iw==
+140: !!binary |
+  jA==
+141: !!binary |
+  jQ==
+142: !!binary |
+  jg==
+143: !!binary |
+  jw==
+144: !!binary |
+  kA==
+145: !!binary |
+  kQ==
+146: !!binary |
+  kg==
+147: !!binary |
+  kw==
+148: !!binary |
+  lA==
+149: !!binary |
+  lQ==
+150: !!binary |
+  lg==
+151: !!binary |
+  lw==
+152: !!binary |
+  mA==
+153: !!binary |
+  mQ==
+154: !!binary |
+  mg==
+155: !!binary |
+  mw==
+156: !!binary |
+  nA==
+157: !!binary |
+  nQ==
+158: !!binary |
+  ng==
+159: !!binary |
+  nw==
+160: !!binary |
+  oA==
+161: !!binary |
+  oQ==
+162: !!binary |
+  og==
+163: !!binary |
+  ow==
+164: !!binary |
+  pA==
+165: !!binary |
+  pQ==
+166: !!binary |
+  pg==
+167: !!binary |
+  pw==
+168: !!binary |
+  qA==
+169: !!binary |
+  qQ==
+170: !!binary |
+  qg==
+171: !!binary |
+  qw==
+172: !!binary |
+  rA==
+173: !!binary |
+  rQ==
+174: !!binary |
+  rg==
+175: !!binary |
+  rw==
+176: !!binary |
+  sA==
+177: !!binary |
+  sQ==
+178: !!binary |
+  sg==
+179: !!binary |
+  sw==
+180: !!binary |
+  tA==
+181: !!binary |
+  tQ==
+182: !!binary |
+  tg==
+183: !!binary |
+  tw==
+184: !!binary |
+  uA==
+185: !!binary |
+  uQ==
+186: !!binary |
+  ug==
+187: !!binary |
+  uw==
+188: !!binary |
+  vA==
+189: !!binary |
+  vQ==
+190: !!binary |
+  vg==
+191: !!binary |
+  vw==
+192: !!binary |
+  wA==
+193: !!binary |
+  wQ==
+194: !!binary |
+  wg==
+195: !!binary |
+  ww==
+196: !!binary |
+  xA==
+197: !!binary |
+  xQ==
+198: !!binary |
+  xg==
+199: !!binary |
+  xw==
+200: !!binary |
+  yA==
+201: !!binary |
+  yQ==
+202: !!binary |
+  yg==
+203: !!binary |
+  yw==
+204: !!binary |
+  zA==
+205: !!binary |
+  zQ==
+206: !!binary |
+  zg==
+207: !!binary |
+  zw==
+208: !!binary |
+  0A==
+209: !!binary |
+  0Q==
+210: !!binary |
+  0g==
+211: !!binary |
+  0w==
+212: !!binary |
+  1A==
+213: !!binary |
+  1Q==
+214: !!binary |
+  1g==
+215: !!binary |
+  1w==
+216: !!binary |
+  2A==
+217: !!binary |
+  2Q==
+218: !!binary |
+  2g==
+219: !!binary |
+  2w==
+220: !!binary |
+  3A==
+221: !!binary |
+  3Q==
+222: !!binary |
+  3g==
+223: !!binary |
+  3w==
+224: !!binary |
+  4A==
+225: !!binary |
+  4Q==
+226: !!binary |
+  4g==
+227: !!binary |
+  4w==
+228: !!binary |
+  5A==
+229: !!binary |
+  5Q==
+230: !!binary |
+  5g==
+231: !!binary |
+  5w==
+232: !!binary |
+  6A==
+233: !!binary |
+  6Q==
+234: !!binary |
+  6g==
+235: !!binary |
+  6w==
+236: !!binary |
+  7A==
+237: !!binary |
+  7Q==
+238: !!binary |
+  7g==
+239: !!binary |
+  7w==
+240: !!binary |
+  8A==
+241: !!binary |
+  8Q==
+242: !!binary |
+  8g==
+243: !!binary |
+  8w==
+244: !!binary |
+  9A==
+245: !!binary |
+  9Q==
+246: !!binary |
+  9g==
+247: !!binary |
+  9w==
+248: !!binary |
+  +A==
+249: !!binary |
+  +Q==
+250: !!binary |
+  +g==
+251: !!binary |
+  +w==
+252: !!binary |
+  /A==
+253: !!binary |
+  /Q==
+254: !!binary |
+  /g==
+255: !!binary |
+  /w==
+256: !!binary |
+  ZSA=
+257: !!binary |
+  LCA=
+258: !!binary |
+  ZCA=
+259: !!binary |
+  LiA=
+260: !!binary |
+  ciA=
+261: !!binary |
+  MjA=
+262: !!binary |
+  cyA=
+263: !!binary |
+  aW4=
+264: !!binary |
+  b24=
+265: !!binary |
+  cmk=
+266: !!binary |
+  dCA=
+267: !!binary |
+  dGg=
+268: !!binary |
+  ZWQg
+269: !!binary |
+  LCAyMA==
+270: !!binary |
+  YW4=
+271: !!binary |
+  YXI=
+272: !!binary |
+  ZXIg
+273: !!binary |
+  eSA=
+274: !!binary |
+  YWw=
+275: !!binary |
+  dGhlIA==
+276: !!binary |
+  dmVkIA==
+277: !!binary |
+  d2k=
+278: !!binary |
+  ZXI=
+279: !!binary |
+  b24g
+280: !!binary |
+  d2lm
+281: !!binary |
+  UmU=
+282: !!binary |
+  U3dpZg==
+283: !!binary |
+  b3Ig
+284: !!binary |
+  Y2g=
+285: !!binary |
+  LCAyMDE=
+286: !!binary |
+  b20=
+287: !!binary |
+  YmVyIA==
+288: !!binary |
+  IHRoZSA=
+289: !!binary |
+  YXk=
+290: !!binary |
+  ZW4=
+291: !!binary |
+  b3I=
+292: !!binary |
+  YWwg
+293: !!binary |
+  ZW0=
+294: !!binary |
+  Lgo=
+295: !!binary |
+  cmll
+296: !!binary |
+  aW5n
+297: !!binary |
+  LCAyMDI=
+298: !!binary |
+  dGk=
+299: !!binary |
+  YXls
+300: !!binary |
+  Ii4g
+301: !!binary |
+  bGw=
+302: !!binary |
+  VGF5bA==
+303: !!binary |
+  dHJpZQ==
+304: !!binary |
+  Lgog
+305: !!binary |
+  dG8=
+306: !!binary |
+  LiBSZQ==
+307: !!binary |
+  LiBSZXRyaWU=
+308: !!binary |
+  LiBSZXRyaWV2ZWQg
+309: !!binary |
+  VGF5bG9yIA==
+310: !!binary |
+  ZXM=
+311: !!binary |
+  VGF5bG9yIFN3aWY=
+312: !!binary |
+  dXM=
+313: !!binary |
+  cm9t
+314: !!binary |
+  ZW1iZXIg
+315: !!binary |
+  KS4g
+316: !!binary |
+  QXI=
+317: !!binary |
+  ZnJvbQ==
+318: !!binary |
+  KS4gIg==
+319: !!binary |
+  YW5kIA==
+320: !!binary |
+  cmU=
+321: !!binary |
+  b3U=
+322: !!binary |
+  b3Jp
+323: !!binary |
+  b2Y=
+324: !!binary |
+  Z2lu
+325: !!binary |
+  aW5nIA==
+326: !!binary |
+  Y2hp
+327: !!binary |
+  XSA=
+328: !!binary |
+  Z2luYWwg
+329: !!binary |
+  ZnJvbSB0aGUg
+330: !!binary |
+  b3JpZ2luYWwg
+331: !!binary |
+  aGUg
+332: !!binary |
+  QXJjaGk=
+333: !!binary |
+  QXJjaGl2ZWQg
+334: !!binary |
+  ZnJvbSB0aGUgb3JpZ2luYWwg
+335: !!binary |
+  QXJjaGl2ZWQgZnJvbSB0aGUgb3JpZ2luYWwg
+336: !!binary |
+  QXJjaGl2ZWQgZnJvbSB0aGUgb3JpZ2luYWwgb24g
+337: !!binary |
+  LiBBcmNoaXZlZCBmcm9tIHRoZSBvcmlnaW5hbCBvbiA=
+338: !!binary |
+  YSA=
+339: !!binary |
+  c3Q=
+340: !!binary |
+  aWM=
+341: !!binary |
+  Lls=
+342: !!binary |
+  ZWM=
+343: !!binary |
+  aWxs
+344: !!binary |
+  J3Mg
+345: !!binary |
+  VGF5bG9yIFN3aWZ0IA==
+346: !!binary |
+  b3Y=
+347: !!binary |
+  YXQ=
+348: !!binary |
+  YXMg
+349: !!binary |
+  ZXMg
+350: !!binary |
+  SnU=
+351: !!binary |
+  b2Yg
+352: !!binary |
+  dG8g
+353: !!binary |
+  dW0=
+354: !!binary |
+  VGhlIA==
+355: !!binary |
+  YXJk
+356: !!binary |
+  aW4g
+357: !!binary |
+  YW4g
+358: !!binary |
+  ZWw=
+359: !!binary |
+  LCAyMDIz
+360: !!binary |
+  YXJ5IA==
+361: !!binary |
+  dGgg
+362: !!binary |
+  YW0=
+363: !!binary |
+  bHkg
+364: !!binary |
+  b3A=
+365: !!binary |
+  VGF5bG9yIFN3aWZ0
+366: !!binary |
+  dHI=
+367: !!binary |
+  aXM=
+368: !!binary |
+  aGVyIA==
+369: !!binary |
+  byA=
+370: !!binary |
+  dWFyeSA=
+371: !!binary |
+  Tm92
+372: !!binary |
+  dXNpYw==
+373: !!binary |
+  Tm92ZW1iZXIg
+374: !!binary |
+  ZXc=
+375: !!binary |
+  YXQg
+376: !!binary |
+  bCA=
+377: !!binary |
+  OiA=
+378: !!binary |
+  Ym8=
+379: !!binary |
+  U3dpZnQg
+380: !!binary |
+  RGVj
+381: !!binary |
+  aXQ=
+382: !!binary |
+  aWc=
+383: !!binary |
+  QmlsbA==
+384: !!binary |
+  MTA=
+385: !!binary |
+  YXM=
+386: !!binary |
+  b25n
+387: !!binary |
+  T2M=
+388: !!binary |
+  YXRp
+389: !!binary |
+  U3Q=
+390: !!binary |
+  T2N0bw==
+391: !!binary |
+  T2N0b2JlciA=
+392: !!binary |
+  YWM=
+393: !!binary |
+  b3c=
+394: !!binary |
+  RGVjZW1iZXIg
+395: !!binary |
+  QmlsbGJv
+396: !!binary |
+  YWQ=
+397: !!binary |
+  bGU=
+398: !!binary |
+  dXI=
+399: !!binary |
+  Zm9yIA==
+400: !!binary |
+  ICg=
+401: !!binary |
+  LCAyMDIy
+402: !!binary |
+  dWc=
+403: !!binary |
+  Y2gg
+404: !!binary |
+  c3Qg
+405: !!binary |
+  b3Vu
+406: !!binary |
+  YnVt
+407: !!binary |
+  b2w=
+408: !!binary |
+  dXN0IA==
+409: !!binary |
+  ZWI=
+410: !!binary |
+  TWE=
+411: !!binary |
+  SnVseSA=
+412: !!binary |
+  KS4gIlRheWxvciBTd2lmdCA=
+413: !!binary |
+  ayA=
+414: !!binary |
+  ZXJz
+415: !!binary |
+  XVs=
+416: !!binary |
+  QXVn
+417: !!binary |
+  QXVndXN0IA==
+418: !!binary |
+  aWQ=
+419: !!binary |
+  LCAyMDIx
+420: !!binary |
+  bWU=
+421: !!binary |
+  ZXA=
+422: !!binary |
+  MjAx
+423: !!binary |
+  MjM=
+424: !!binary |
+  LCAyMDEy
+425: !!binary |
+  ZWFy
+426: !!binary |
+  LCAyMDIw
+427: !!binary |
+  SW4=
+428: !!binary |
+  Zmk=
+429: !!binary |
+  bmUg
+430: !!binary |
+  QmlsbGJvYXJk
+431: !!binary |
+  cml0
+432: !!binary |
+  aGk=
+433: !!binary |
+  dXNpYyA=
+434: !!binary |
+  LgogIg==
+435: !!binary |
+  TmV3
+436: !!binary |
+  ZGk=
+437: !!binary |
+  QXA=
+438: !!binary |
+  LCAyMDE5
+439: !!binary |
+  cm8=
+440: !!binary |
+  JyA=
+441: !!binary |
+  cywg
+442: !!binary |
+  SnVuZSA=
+443: !!binary |
+  b2YgdGhlIA==
+444: !!binary |
+  Y29y
+445: !!binary |
+  MjE=
+446: !!binary |
+  MTk=
+447: !!binary |
+  aW0=
+448: !!binary |
+  ZW4g
+449: !!binary |
+  ZWJy
+450: !!binary |
+  ZW50
+451: !!binary |
+  b2xs
+452: !!binary |
+  TWFy
+453: !!binary |
+  cmlj
+454: !!binary |
+  d2l0aCA=
+455: !!binary |
+  LFs=
+456: !!binary |
+  RmVicg==
+457: !!binary |
+  RmVicnVhcnkg
+458: !!binary |
+  VGF5bG9yIFN3aWZ0J3Mg
+459: !!binary |
+  Ii4gQmlsbGJvYXJk
+460: !!binary |
+  ZWE=
+461: !!binary |
+  LCAyMDE2
+462: !!binary |
+  ZXB0
+463: !!binary |
+  TWF5IA==
+464: !!binary |
+  LCAyMDE1
+465: !!binary |
+  QXByaQ==
+466: !!binary |
+  QXByaWwg
+467: !!binary |
+  bGUg
+468: !!binary |
+  QXc=
+469: !!binary |
+  YXRpb24=
+470: !!binary |
+  U2VwdA==
+471: !!binary |
+  U2VwdGVtYmVyIA==
+472: !!binary |
+  cmE=
+473: !!binary |
+  YWxidW0=
+474: !!binary |
+  Q2g=
+475: !!binary |
+  dmUg
+476: !!binary |
+  ZXN0IA==
+477: !!binary |
+  SmFu
+478: !!binary |
+  MjI=
+479: !!binary |
+  SmFudWFyeSA=
+480: !!binary |
+  b3VudHI=
+481: !!binary |
+  aWdo
+482: !!binary |
+  Ii4gVGhlIA==
+483: !!binary |
+  LCAyMDIzLgog
+484: !!binary |
+  MTM=
+485: !!binary |
+  QWw=
+486: !!binary |
+  ZXQ=
+487: !!binary |
+  ZXNz
+488: !!binary |
+  TWFyY2gg
+489: !!binary |
+  dXQ=
+490: !!binary |
+  d3JpdA==
+491: !!binary |
+  bG8=
+492: !!binary |
+  c29uZw==
+493: !!binary |
+  4oA=
+494: !!binary |
+  YXJkIA==
+495: !!binary |
+  MCA=
+496: !!binary |
+  dWw=
+497: !!binary |
+  MjQ=
+498: !!binary |
+  aXMg
+499: !!binary |
+  dGlj
