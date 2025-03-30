@@ -254,6 +254,8 @@ if __name__ == "__main__":
             continue
 
         # Split on train and val dataloaders
+        # TODO: if data is not enough for batch size - continue to the next file and add it to train_data
+        # TODO: fix weight loading
         split_idx = int(len(text_data) * train_test_ratio)
         batch_size_ = min(batch_size, (len(text_data) - split_idx)//context_size)
 
