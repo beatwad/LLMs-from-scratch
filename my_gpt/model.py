@@ -1,17 +1,7 @@
 import torch
 import torch.nn as nn
 from typing import Any, Dict
-
-
-GPT_CONFIG_124M = {
-    "vocab_size": 50257,    # Vocabulary size
-    "context_length": 256,  # Context length
-    "emb_dim": 768,         # Embedding dimension
-    "n_heads": 12,          # Number of attention heads
-    "n_layers": 12,         # Number of layers
-    "drop_rate": 0.1,       # Dropout rate
-    "qkv_bias": False       # Query-Key-Value bias
-}
+from constants import GPT_CONFIG_124M
 
 
 class GPTModel(nn.Module):
@@ -66,12 +56,13 @@ class MultiHeadAttention(nn.Module):
         self.attn_dim = cfg["emb_dim"]
         self.n_heads = cfg["n_heads"]
         self.head_dim = cfg["emb_dim"] // cfg["n_heads"]
-        self.dropout = cfg["drop_rate"]
+        self.drop_rate = cfg["drop_rate"]
         self.context_len = cfg["context_length"]
         self.qkv_bias = cfg["qkv_bias"]
+        self.flash = cfg["flash"]
         
         self.attn = nn.Linear(self.attn_dim, self.attn_dim * 3, bias=self.qkv_bias)
-        self.dropout = nn.Dropout(self.dropout)
+        self.dropout = nn.Dropout(self.drop_rate)
         self.out_proj = nn.Linear(self.attn_dim, self.attn_dim)  # Linear layer to combine head outputs
 
         self.register_buffer("mask", torch.tril(torch.ones(self.context_len, self.context_len)).view(1, 1, self.context_len, self.context_len))
@@ -83,12 +74,17 @@ class MultiHeadAttention(nn.Module):
         attn = attn.view(batch_size, num_tokens, self.n_heads, self.head_dim * 3).transpose(2, 1)  # (batch_size, n_heads, num_tokens, head_dim * 3)
         Q, K, V = torch.split(attn, self.head_dim, dim=-1) # (batch_size, num_tokens, n_heads, head_dim)
  
-        attn = Q @ K.transpose(-2, -1) * self.head_dim ** -0.5  # (batch_size, n_heads, num_tokens, num_tokens)
-        attn = attn.masked_fill((self.mask==0)[:, :, :num_tokens, :num_tokens], float("-inf"))
-        attn = torch.softmax(attn, dim=-1)
-        attn = self.dropout(attn)
+        if self.flash:
+            # efficient attention using Flash Attention CUDA kernels
+            out = torch.nn.functional.scaled_dot_product_attention(Q, K, V, attn_mask=None, dropout_p=self.drop_rate, is_causal=True)
+        else:
+            attn = Q @ K.transpose(-2, -1) * self.head_dim ** -0.5  # (batch_size, n_heads, num_tokens, num_tokens)
+            attn = attn.masked_fill((self.mask==0)[:, :, :num_tokens, :num_tokens], float("-inf"))
+            attn = torch.softmax(attn, dim=-1)
+            attn = self.dropout(attn)
+            out = attn @ V
         
-        out = (attn @ V).transpose(1, 2)  # (batch_size, num_tokens, n_heads, head_dim)
+        out = out.transpose(1, 2) # (batch_size, num_tokens, n_heads, head_dim)
         # ensure that a tensor's memory is stored in a contiguous block
         out = out.contiguous().view(batch_size, num_tokens, self.attn_dim) # (batch_size, num_tokens, attn_dim)
         out = self.out_proj(out)

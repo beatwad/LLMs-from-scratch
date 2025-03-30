@@ -1,18 +1,18 @@
-from calendar import c
+import os
+import urllib
 from typing import Any, List
+import urllib.error
 import torch
 from torch.optim import AdamW
 from torch.nn import CrossEntropyLoss
 
-from model import GPTModel, GPT_CONFIG_124M
+from constants import GPT_CONFIG_124M, TRAIN_SETTINGS
+from model import GPTModel
 from dataloader import create_dataloader_v1
 
 import matplotlib.pyplot as plt
 import tiktoken
 
-
-torch.manual_seed(123)
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 def text_2_token_ids(text: str, tokenizer: Any) -> torch.tensor:
@@ -71,7 +71,7 @@ def generate_text(
     
     return ids
 
-def calc_loss(model, dataloader, loss_fn, eval_num) -> float:
+def calc_loss(model, dataloader, device, loss_fn, eval_num) -> float:
     i, loss = 0, 0
     for train, test in dataloader:
         train, test = train.to(device), test.to(device)
@@ -87,11 +87,11 @@ def calc_loss(model, dataloader, loss_fn, eval_num) -> float:
         return float("inf")
     return loss / i
 
-def evaluate_model(model, train_loader, val_loader, loss_fn, eval_num) -> float:
+def evaluate_model(model, train_loader, val_loader, device, loss_fn, eval_num) -> float:
     model.eval()
     with torch.no_grad():
-        train_loss = calc_loss(model, train_loader, loss_fn, eval_num)
-        val_loss = calc_loss(model, val_loader, loss_fn, eval_num)
+        train_loss = calc_loss(model, train_loader, device, loss_fn, eval_num)
+        val_loss = calc_loss(model, val_loader, device, loss_fn, eval_num)
     model.train()
     return train_loss, val_loss
 
@@ -118,13 +118,15 @@ def generate_and_print_sample(
             top_p=top_p,
         )
         decoded_text = token_ids_2_text(token_ids, tokenizer)
-        print(decoded_text.replace("\n", " "))  # Compact print format
+        print(decoded_text.replace("\n", " ").replace("\r", ""))
     model.train()
 
 def train(
         model: Any, 
+        optimizer: Any,
         train_loader: Any, 
         val_loader: Any, 
+        device: Any,
         n_epochs: int,
         start_context: str,
         tokenizer: str,
@@ -132,9 +134,7 @@ def train(
         eval_num: int = 10,
         verbose: bool = False,
         ):
-    model.to(device)
 
-    optimizer = AdamW(model.parameters(), lr=3e-4, weight_decay=1e-2)
     loss_fn = CrossEntropyLoss()
 
     train_losses, val_losses, track_tokens_seen = [], [], []
@@ -161,7 +161,7 @@ def train(
             global_step += 1
             
             if global_step % eval_period == 0:
-                train_loss, val_loss = evaluate_model(model, train_loader, val_loader, loss_fn, eval_num)
+                train_loss, val_loss = evaluate_model(model, train_loader, val_loader, device, loss_fn, eval_num)
                 train_losses.append(train_loss)
                 val_losses.append(val_loss)
                 track_tokens_seen.append(tokens_seen)
@@ -193,57 +193,108 @@ def plot_losses(epochs_seen, tokens_seen, train_losses, val_losses):
 
 
 if __name__ == "__main__":
-    TRAIN_SETTINGS = {
-        "learning_rate": 5e-4,
-        "num_epochs": 10,
-        "batch_size": 2,
-        "weight_decay": 0.1,
-        "train_test_ratio": 0.9,
-    }
+    # Set device and Pytorch settings
+    torch.manual_seed(123)
+    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+    
+    print(f"PyTorch version: {torch.__version__}")
+    print(f"Using {device}")
+    if torch.cuda.is_available():
+        print(f"CUDA version: {torch.version.cuda}")
 
-    model = GPTModel(GPT_CONFIG_124M)
+        capability = torch.cuda.get_device_capability()
+        if capability[0] >= 7:  # Volta (7.0+), Turing (7.5+), Ampere (8.0+), Hopper (9.0+)
+            torch.set_float32_matmul_precision("high")
+            print("Uses tensor cores")
+        else:
+            print("Tensor cores not supported on this GPU. Using default precision.")
+    print(f"Uses tensor cores: {torch.cuda.is_available()}")
 
-    tokenizer = tiktoken.get_encoding("gpt2")
-    with open("the-verdict.txt") as f:
-        text_data = f.read()
-
+    # Get settings
     n_epochs = TRAIN_SETTINGS["num_epochs"]
     batch_size = TRAIN_SETTINGS["batch_size"]
     train_test_ratio = TRAIN_SETTINGS["train_test_ratio"]
-    
     start_context = "Every effort moves you"
     context_size = GPT_CONFIG_124M["context_length"]
+    
+    # Load and initialize model
+    model = GPTModel(GPT_CONFIG_124M)
+    if os.path.exists("model.pth"):
+        model.load_state_dict(torch.load("model.pth", weights_only=True))
+    model = torch.compile(model)
+    model.to(device).to(torch.bfloat16)
 
-    split_idx = int(len(text_data) * train_test_ratio)
-    train_loader = create_dataloader_v1(
-        text_data[:split_idx], 
-        tokenizer, 
-        batch_size, 
-        max_length=context_size,
-        shuffle=True, 
-        drop_last=True,
+    # Initialize tokenizer and optimizer
+    tokenizer = tiktoken.get_encoding("gpt2")
+    optimizer = torch.optim.AdamW(
+        model.parameters(), 
+        lr=TRAIN_SETTINGS["learning_rate"],
+        weight_decay=TRAIN_SETTINGS["weight_decay"],
+        fused=True,
         )
     
-    val_loader = create_dataloader_v1(
-        text_data[split_idx:], 
-        tokenizer, 
-        batch_size, 
-        max_length=context_size,
-        shuffle=False, 
-        drop_last=False,
-        )
+    # Load the number of last file on which model was trained before
+    try:
+        with open("last_file_num.txt") as f:
+            last_file = int(f.read())
+    except FileNotFoundError:
+        last_file = 0
+    
+    # Walk through every file of Guttenberg Library
+    for i in range(last_file + 1, 75000):
+        # Load file to train on
+        url = f"https://www.gutenberg.org/cache/epub/{i}/pg{i}.txt"
+        print(f"Loading: {url}")
+        
+        try:
+            with urllib.request.urlopen(url) as response:
+                text_data = response.read().decode('utf-8')
+        except urllib.error.HTTPError as e:
+            print(f"URL error: {e}")
+            continue
 
-    train_losses, val_losses, tokens_seen = train(
-        model, 
-        train_loader, 
-        val_loader, 
-        n_epochs, 
-        start_context, 
-        tokenizer, 
-        verbose=True,
-        )
+        # Split on train and val dataloaders
+        split_idx = int(len(text_data) * train_test_ratio)
+        batch_size_ = min(batch_size, (len(text_data) - split_idx)//context_size)
 
-    epochs_tensor = torch.linspace(0, TRAIN_SETTINGS["num_epochs"], len(train_losses))
-    # import code; code.interact(local=locals())
-    plot_losses(epochs_tensor, tokens_seen, train_losses, val_losses)
-    plt.savefig("loss.pdf")
+        train_loader = create_dataloader_v1(
+            text_data[:split_idx], 
+            tokenizer, 
+            batch_size_, 
+            max_length=context_size,
+            shuffle=True, 
+            drop_last=True,
+            )
+        
+        val_loader = create_dataloader_v1(
+            text_data[split_idx:], 
+            tokenizer, 
+            batch_size_, 
+            max_length=context_size,
+            shuffle=False, 
+            drop_last=False,
+            )
+
+        # Train model on file
+        train_losses, val_losses, tokens_seen = train(
+            model, 
+            optimizer,
+            train_loader, 
+            val_loader, 
+            device,
+            n_epochs, 
+            start_context, 
+            tokenizer, 
+            verbose=True,
+            )
+
+        # epochs_tensor = torch.linspace(0, TRAIN_SETTINGS["num_epochs"], len(train_losses))
+        # plot_losses(epochs_tensor, tokens_seen, train_losses, val_losses)
+        # plt.savefig("loss.pdf")
+
+        # Save and load model
+        torch.save(model.state_dict(), "model.pth")
+
+        # Save number of the last file model was trained on
+        with open("last_file_num.txt", "w") as f:
+            f.write(str(i))
