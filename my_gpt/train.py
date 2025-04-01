@@ -381,7 +381,15 @@ if __name__ == "__main__":
         
         # Load optimizer state if it exists
         if "optimizer_state_dict" in checkpoint:
-            optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+            optimizer_state_dict = checkpoint["optimizer_state_dict"]
+            # Move optimizer state to the correct device
+            for state in optimizer_state_dict.values():
+                # import code; code.interact(local=dict(globals(), **locals()))
+                if isinstance(state, dict):
+                    for k, v in state.items():
+                        if isinstance(v, torch.Tensor):
+                            state[k] = v.to(device)
+            optimizer.load_state_dict(optimizer_state_dict)
             print("Loaded optimizer state from checkpoint")
 
     model.to(device).to(torch.bfloat16)

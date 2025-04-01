@@ -8,8 +8,3 @@ GPT_CONFIG_124M = {
     "qkv_bias": False,      # Query-Key-Value bias
     "flash": True,          # Use Flash Attention or not
 }
-
-LAST_FILE_PATH = "data_folder/last_file_num.txt"
-
-
-MODEL_PATH = "data_folder/model.pth"
