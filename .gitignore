@@ -121,6 +121,11 @@ ch0?/0?_user_interface/chainlit.md
 ch0?/0?_user_interface/.files
 *.lock
 
+my_gpt/data_folder/
+my_gpt/gutenberg/
+my_gpt/gutenberg_preprocessed/
+my_gpt/wandb/
+
 # Temporary OS-related files
 .DS_Store
 

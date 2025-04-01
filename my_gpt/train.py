@@ -12,7 +12,7 @@ from torch.nn import CrossEntropyLoss
 
 from constants import GPT_CONFIG_124M
 from src.model import GPTModel
-from src.dataloader import create_dataloader_v1
+from src.dataloader import create_dataloader
 
 import tiktoken
 
@@ -150,7 +150,8 @@ def train(
         model_last_step: int = -1,
         eval_period: int = 100,
         print_sample_period: int = 1000,
-        save_ckpt_period: int = 100_000,
+        save_ckpt_period: int = 1000,
+        model_dir: str = "model_checkpoints",
         ):
 
     loss_fn = CrossEntropyLoss()
@@ -218,7 +219,7 @@ def train(
                 generate_and_print_sample(model, tokenizer, device, start_context)
 
             if global_step % save_ckpt_period == 0 and global_step >= model_last_step:
-                file_name = output_dir / f"model_pg_{global_step}.pth"
+                file_name = model_dir / f"model_pg_{global_step}.pth"
                 # Save and load model
                 torch.save(
                     {
@@ -230,7 +231,7 @@ def train(
                 print(f"Saved {file_name}")
     
     except KeyboardInterrupt:
-        file_name = output_dir / f"model_pg_{global_step}.pth"
+        file_name = model_dir / f"model_pg_{global_step}.pth"
         # Save and load model
         torch.save(
             {
@@ -239,13 +240,14 @@ def train(
             },
             file_name,
         )
+        raise KeyboardInterrupt
 
     return train_losses, val_losses, track_tokens_seen
 
 
 def get_lr(step, warmup_steps, max_lr):
     min_lr = 0.1 * max_lr
-    max_steps = 1000 * warmup_steps
+    max_steps = 100 * warmup_steps
     
     if step < warmup_steps:
         return max_lr * (step + 1) / warmup_steps
@@ -263,7 +265,7 @@ if __name__ == "__main__":
 
     parser.add_argument('--data_dir', type=str, default='gutenberg_preprocessed',
                         help='Directory containing the training data')
-    parser.add_argument('--output_dir', type=str, default='data_folder/model_checkpoints',
+    parser.add_argument('--output_dir', type=str, default='data_folder',
                         help='Directory where the model checkpoints will be saved')
     parser.add_argument('--n_epochs', type=int, default=1,
                         help='Number of epochs to train the model')
@@ -279,7 +281,7 @@ if __name__ == "__main__":
                         help='Batch size for training')
     parser.add_argument('--train_val_ratio', type=float, default=0.9,
                         help='Train / validation datasets ratio (e.g. if 0.9 then train size = 0.9*len(dataset) and val = 0.1*len(dataset))')
-    parser.add_argument('--warmup', type=int, default=50,
+    parser.add_argument('--warmup', type=int, default=100,
                         help='Number of warmup training steps')
     parser.add_argument('--wandb_project', type=str, default='gpt-train',
                         help='Weights & Biases project name')
@@ -349,11 +351,12 @@ if __name__ == "__main__":
         fused=True,
         )
     
-    output_dir = Path(args.output_dir)
-    output_dir.mkdir(parents=True, exist_ok=True)
+    cache_dir = Path(args.output_dir) / "cache"
+    model_dir = Path(args.output_dir) / "model_checkpoints"
+    model_dir.mkdir(parents=True, exist_ok=True)
 
     # Get the latest saved model (if exists)
-    model_files = list(output_dir.glob("*.pth"))
+    model_files = list(model_dir.glob("*.pth"))
     max_step_num = -1
 
     for f in model_files:
@@ -364,7 +367,7 @@ if __name__ == "__main__":
     model_name = f"model_pg_{max_step_num}.pth" if max_step_num > 0 else ""
 
     if model_name:
-        checkpoint = torch.load(output_dir / model_name, map_location=device)
+        checkpoint = torch.load(model_dir / model_name, map_location=device)
         
         state_dict = checkpoint["model_state_dict"]
 
@@ -398,9 +401,9 @@ if __name__ == "__main__":
               "selected the correct input directory")
         quit()
     print("Total files:", total_files)
+    all_files.sort()
     
     # Iterate over the books in the training corpus
-    import code; code.interact(local=locals())
     for index, file_path in tqdm(enumerate(all_files)):
         text_data = read_text_file(file_path) + " <|endoftext|> "
         print(f"Tokenizing file {index} of {total_files}: {file_path}")
@@ -410,22 +413,24 @@ if __name__ == "__main__":
         if batch_size > (len(text_data) - split_idx)//context_size:
             continue
 
-        train_loader = create_dataloader_v1(
+        train_loader = create_dataloader(
             text_data[:split_idx], 
             tokenizer, 
             batch_size, 
             max_length=context_size,
             shuffle=True, 
             drop_last=True,
+            cache_dir=cache_dir,
             )
         
-        val_loader = create_dataloader_v1(
+        val_loader = create_dataloader(
             text_data[split_idx:], 
             tokenizer, 
             batch_size, 
             max_length=context_size,
             shuffle=False, 
             drop_last=False,
+            cache_dir=cache_dir,
             )
 
         # Train model on file
@@ -443,4 +448,5 @@ if __name__ == "__main__":
             print_sample_period=args.print_sample_period,
             warmup_steps=args.warmup,
             model_last_step=max_step_num,
+            model_dir=model_dir,
             )
