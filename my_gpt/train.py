@@ -1,18 +1,26 @@
 import os
-import urllib
-from typing import Any, List
-import urllib.error
+import math
 import torch
+import wandb
+import argparse
+
+from typing import Any, List
+from pathlib import Path
+from tqdm.auto import tqdm
 from torch.optim import AdamW
 from torch.nn import CrossEntropyLoss
 
-from constants import GPT_CONFIG_124M, TRAIN_SETTINGS
-from model import GPTModel
-from dataloader import create_dataloader_v1
+from constants import GPT_CONFIG_124M
+from src.model import GPTModel
+from src.dataloader import create_dataloader_v1
 
-import matplotlib.pyplot as plt
 import tiktoken
 
+
+def read_text_file(file_path):
+    with open(file_path, "r", encoding="utf-8") as file:
+        text_data = file.read()
+    return text_data
 
 
 def text_2_token_ids(text: str, tokenizer: Any) -> torch.tensor:
@@ -20,9 +28,11 @@ def text_2_token_ids(text: str, tokenizer: Any) -> torch.tensor:
     encoded_tensor = torch.tensor(encoded).unsqueeze(0)
     return encoded_tensor
 
+
 def token_ids_2_text(ids: torch.tensor, tokenizer: Any) -> str:
     decoded = tokenizer.decode(ids.squeeze(0).tolist())
     return decoded
+
 
 def generate_text(
         model: Any, 
@@ -71,6 +81,7 @@ def generate_text(
     
     return ids
 
+
 def calc_loss(model, dataloader, device, loss_fn, eval_num) -> float:
     i, loss = 0, 0
     for train, test in dataloader:
@@ -87,6 +98,7 @@ def calc_loss(model, dataloader, device, loss_fn, eval_num) -> float:
         return float("inf")
     return loss / i
 
+
 def evaluate_model(model, train_loader, val_loader, device, loss_fn, eval_num) -> float:
     model.eval()
     with torch.no_grad():
@@ -94,6 +106,7 @@ def evaluate_model(model, train_loader, val_loader, device, loss_fn, eval_num) -
         val_loss = calc_loss(model, val_loader, device, loss_fn, eval_num)
     model.train()
     return train_loss, val_loss
+
 
 def generate_and_print_sample(
         model, 
@@ -121,6 +134,7 @@ def generate_and_print_sample(
         print(decoded_text.replace("\n", " ").replace("\r", ""))
     model.train()
 
+
 def train(
         model: Any, 
         optimizer: Any,
@@ -128,11 +142,15 @@ def train(
         val_loader: Any, 
         device: Any,
         n_epochs: int,
+        lr: float,
         start_context: str,
         tokenizer: str,
-        eval_period: int = 10,
         eval_num: int = 10,
-        verbose: bool = False,
+        warmup_steps: int = 50,
+        model_last_step: int = -1,
+        eval_period: int = 100,
+        print_sample_period: int = 1000,
+        save_ckpt_period: int = 100_000,
         ):
 
     loss_fn = CrossEntropyLoss()
@@ -141,58 +159,153 @@ def train(
     tokens_seen = 0
     global_step = -1
     
-    for _ in range(n_epochs):
-        model.train()
+    try:
+        for _ in range(n_epochs):
+            model.train()
 
-        for train_batch, target_batch in train_loader:
-            train_batch, target_batch = train_batch.to(device), target_batch.to(device)
-            optimizer.zero_grad()
+            for train_batch, target_batch in train_loader:
+                
+                global_step += 1
+                if global_step < model_last_step:
+                    continue
+
+                train_batch, target_batch = train_batch.to(device), target_batch.to(device)
+                optimizer.zero_grad()
+                
+                logits = model(train_batch)
+                input = logits.flatten(0, 1)
+                labels = target_batch.flatten()
+                
+                loss = loss_fn(input, labels)
+                loss.backward()
+                
+                tokens_seen += train_batch.numel()
+                
+                # is used to prevent model get shocked by too much value of the gradient
+                norm = torch.nn.utils.clip_grad_norm_(model.parameters(), 1.0)
+                
+                # set the learning rate fot this iteration
+                new_lr = get_lr(global_step, warmup_steps, lr)
+                for param_group in optimizer.param_groups:
+                    param_group['lr'] = new_lr
+                optimizer.step()
+                
+                # Log training metrics to wandb
+                wandb.log({
+                    "train/loss": loss.item(),
+                    "train/learning_rate": new_lr,
+                    "train/grad_norm": norm.item(),
+                    "train/tokens_seen": tokens_seen,
+                    "train/global_step": global_step
+                })
+                
+                if global_step % eval_period == 0:
+                    train_loss, val_loss = evaluate_model(model, train_loader, val_loader, device, loss_fn, eval_num)
+                    train_losses.append(train_loss)
+                    val_losses.append(val_loss)
+                    track_tokens_seen.append(tokens_seen)
+                    print(f"Train loss: {train_loss:.4f}, val loss: {val_loss:.4f}")
+                    
+                    # Log evaluation metrics to wandb
+                    wandb.log({
+                        "eval/train_loss": train_loss,
+                        "eval/val_loss": val_loss,
+                        "eval/tokens_seen": tokens_seen,
+                        "eval/global_step": global_step
+                    })
             
-            logits = model(train_batch)
-            input = logits.flatten(0, 1)
-            labels = target_batch.flatten()
-            
-            loss = loss_fn(input, labels)
-            loss.backward()
-            
-            optimizer.step()
-        
-            tokens_seen += train_batch.numel()
-            global_step += 1
-            
-            if global_step % eval_period == 0:
-                train_loss, val_loss = evaluate_model(model, train_loader, val_loader, device, loss_fn, eval_num)
-                train_losses.append(train_loss)
-                val_losses.append(val_loss)
-                track_tokens_seen.append(tokens_seen)
-                print(f"Train loss: {train_loss:.4f}, val loss: {val_loss:.4f}")
-           
-        if verbose:
-            generate_and_print_sample(model, tokenizer, device, start_context)
+            if global_step % print_sample_period == 0 and global_step >= model_last_step:
+                generate_and_print_sample(model, tokenizer, device, start_context)
+
+            if global_step % save_ckpt_period == 0 and global_step >= model_last_step:
+                file_name = output_dir / f"model_pg_{global_step}.pth"
+                # Save and load model
+                torch.save(
+                    {
+                        "model_state_dict": model.state_dict(),
+                        "optimizer_state_dict": optimizer.state_dict(),
+                    },
+                    file_name,
+                )
+                print(f"Saved {file_name}")
+    
+    except KeyboardInterrupt:
+        file_name = output_dir / f"model_pg_{global_step}.pth"
+        # Save and load model
+        torch.save(
+            {
+                "model_state_dict": model.state_dict(),
+                "optimizer_state_dict": optimizer.state_dict(),
+            },
+            file_name,
+        )
 
     return train_losses, val_losses, track_tokens_seen
 
 
-def plot_losses(epochs_seen, tokens_seen, train_losses, val_losses):
-    fig, ax1 = plt.subplots()
-
-    # Plot training and validation loss against epochs
-    ax1.plot(epochs_seen, train_losses, label="Training loss")
-    ax1.plot(epochs_seen, val_losses, linestyle="-.", label="Validation loss")
-    ax1.set_xlabel("Epochs")
-    ax1.set_ylabel("Loss")
-    ax1.legend(loc="upper right")
-
-    # Create a second x-axis for tokens seen
-    ax2 = ax1.twiny()  # Create a second x-axis that shares the same y-axis
-    ax2.plot(tokens_seen, train_losses, alpha=0)  # Invisible plot for aligning ticks
-    ax2.set_xlabel("Tokens seen")
-
-    fig.tight_layout()  # Adjust layout to make room
-    # plt.show()
+def get_lr(step, warmup_steps, max_lr):
+    min_lr = 0.1 * max_lr
+    max_steps = 1000 * warmup_steps
+    
+    if step < warmup_steps:
+        return max_lr * (step + 1) / warmup_steps
+    
+    if step > max_steps:
+        return min_lr
+    
+    decay_ratio = (step - warmup_steps) / (max_steps - warmup_steps)
+    coeff = 0.5 * (1.0 + math.cos(math.pi * decay_ratio))
+    return min_lr + coeff * (max_lr - min_lr)
 
 
 if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description='GPT Model Training Configuration')
+
+    parser.add_argument('--data_dir', type=str, default='gutenberg_preprocessed',
+                        help='Directory containing the training data')
+    parser.add_argument('--output_dir', type=str, default='data_folder/model_checkpoints',
+                        help='Directory where the model checkpoints will be saved')
+    parser.add_argument('--n_epochs', type=int, default=1,
+                        help='Number of epochs to train the model')
+    parser.add_argument('--print_sample_period', type=int, default=1000,
+                        help='Iterations between printing sample outputs')
+    parser.add_argument('--eval_freq', type=int, default=100,
+                        help='Frequency of evaluations during training')
+    parser.add_argument('--lr', type=float, default=5e-4,
+                        help='Learning rate for the optimizer')
+    parser.add_argument('--wd', type=float, default=0.1,
+                        help='Weight decay for the optimizer')
+    parser.add_argument('--batch_size', type=int, default=96,
+                        help='Batch size for training')
+    parser.add_argument('--train_val_ratio', type=float, default=0.9,
+                        help='Train / validation datasets ratio (e.g. if 0.9 then train size = 0.9*len(dataset) and val = 0.1*len(dataset))')
+    parser.add_argument('--warmup', type=int, default=50,
+                        help='Number of warmup training steps')
+    parser.add_argument('--wandb_project', type=str, default='gpt-train',
+                        help='Weights & Biases project name')
+    parser.add_argument('--wandb_entity', type=str, default='beatwad',
+                        help='Weights & Biases entity (username or team name)')
+    parser.add_argument('--wandb_name', type=str, default='wandb_run',
+                        help='Weights & Biases run name')
+
+    args = parser.parse_args()
+    
+    # Initialize wandb
+    wandb.init(
+        project=args.wandb_project,
+        entity=args.wandb_entity,
+        name=args.wandb_name,
+        config={
+            "model_config": GPT_CONFIG_124M,
+            "learning_rate": args.lr,
+            "weight_decay": args.wd,
+            "batch_size": args.batch_size,
+            "n_epochs": args.n_epochs,
+            "train_val_ratio": args.train_val_ratio,
+            "warmup_steps": args.warmup,
+        }
+    )
+    
     # Set device and Pytorch settings
     torch.manual_seed(123)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -210,59 +323,97 @@ if __name__ == "__main__":
             print("Tensor cores not supported on this GPU. Using default precision.")
     print(f"Uses tensor cores: {torch.cuda.is_available()}")
 
+    # Log system info to wandb
+    wandb.log({
+        "system/pytorch_version": torch.__version__,
+        "system/cuda_available": torch.cuda.is_available(),
+        "system/cuda_version": torch.version.cuda if torch.cuda.is_available() else None,
+        "system/device": str(device),
+        "system/tensor_cores": torch.cuda.is_available() and torch.cuda.get_device_capability()[0] >= 7
+    })
+
     # Get settings
-    n_epochs = TRAIN_SETTINGS["num_epochs"]
-    batch_size = TRAIN_SETTINGS["batch_size"]
-    train_test_ratio = TRAIN_SETTINGS["train_test_ratio"]
     start_context = "Every effort moves you"
+    n_epochs = args.n_epochs
+    batch_size = args.batch_size
+    train_val_ratio = args.train_val_ratio
+    
     context_size = GPT_CONFIG_124M["context_length"]
     
-    # Load and initialize model
+    # Load and initialize model and optimizer
     model = GPTModel(GPT_CONFIG_124M)
-    if os.path.exists("model.pth"):
-        model.load_state_dict(torch.load("model.pth", weights_only=True))
-    model = torch.compile(model)
-    model.to(device).to(torch.bfloat16)
-
-    # Initialize tokenizer and optimizer
-    tokenizer = tiktoken.get_encoding("gpt2")
     optimizer = torch.optim.AdamW(
         model.parameters(), 
-        lr=TRAIN_SETTINGS["learning_rate"],
-        weight_decay=TRAIN_SETTINGS["weight_decay"],
+        lr=args.lr,
+        weight_decay=0.1,
         fused=True,
         )
     
-    # Load the number of last file on which model was trained before
-    try:
-        with open("last_file_num.txt") as f:
-            last_file = int(f.read())
-    except FileNotFoundError:
-        last_file = 0
-    
-    # Walk through every file of Guttenberg Library
-    for i in range(last_file + 1, 75000):
-        # Load file to train on
-        url = f"https://www.gutenberg.org/cache/epub/{i}/pg{i}.txt"
-        print(f"Loading: {url}")
+    output_dir = Path(args.output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Get the latest saved model (if exists)
+    model_files = list(output_dir.glob("*.pth"))
+    max_step_num = -1
+
+    for f in model_files:
+        step_num = str(f).split("_")[-1].split(".")[0]
+        if step_num.isdigit():
+            max_step_num = max(max_step_num, int(step_num))
+
+    model_name = f"model_pg_{max_step_num}.pth" if max_step_num > 0 else ""
+
+    if model_name:
+        checkpoint = torch.load(output_dir / model_name, map_location=device)
         
-        try:
-            with urllib.request.urlopen(url) as response:
-                text_data = response.read().decode('utf-8')
-        except urllib.error.HTTPError as e:
-            print(f"URL error: {e}")
-            continue
+        state_dict = checkpoint["model_state_dict"]
+
+        # Remove "_orig_mod." prefix from keys
+        model_state_dict = {}
+        for k, v in state_dict.items():
+            new_key = k.replace("_orig_mod.", "")
+            model_state_dict[new_key] = v
+
+        model.load_state_dict(model_state_dict)
+        
+        # Load optimizer state if it exists
+        if "optimizer_state_dict" in checkpoint:
+            optimizer.load_state_dict(checkpoint["optimizer_state_dict"])
+            print("Loaded optimizer state from checkpoint")
+
+    model.to(device).to(torch.bfloat16)
+    model = torch.compile(model)
+    
+    # Initialize tokenizer
+    tokenizer = tiktoken.get_encoding("gpt2")
+    
+    # Load the number of last file on which model was trained before
+    data_dir = args.data_dir
+    all_files = [os.path.join(path, name) for path, subdirs, files
+                 in os.walk(data_dir) for name in files if name.endswith((".txt"))]
+    total_files = len(all_files)
+
+    if total_files == 0:
+        print("No training text files found. Make sure you "
+              "selected the correct input directory")
+        quit()
+    print("Total files:", total_files)
+    
+    # Iterate over the books in the training corpus
+    import code; code.interact(local=locals())
+    for index, file_path in tqdm(enumerate(all_files)):
+        text_data = read_text_file(file_path) + " <|endoftext|> "
+        print(f"Tokenizing file {index} of {total_files}: {file_path}")
 
         # Split on train and val dataloaders
-        # TODO: if data is not enough for batch size - continue to the next file and add it to train_data
-        # TODO: fix weight loading
-        split_idx = int(len(text_data) * train_test_ratio)
-        batch_size_ = min(batch_size, (len(text_data) - split_idx)//context_size)
+        split_idx = int(len(text_data) * train_val_ratio)
+        if batch_size > (len(text_data) - split_idx)//context_size:
+            continue
 
         train_loader = create_dataloader_v1(
             text_data[:split_idx], 
             tokenizer, 
-            batch_size_, 
+            batch_size, 
             max_length=context_size,
             shuffle=True, 
             drop_last=True,
@@ -271,7 +422,7 @@ if __name__ == "__main__":
         val_loader = create_dataloader_v1(
             text_data[split_idx:], 
             tokenizer, 
-            batch_size_, 
+            batch_size, 
             max_length=context_size,
             shuffle=False, 
             drop_last=False,
@@ -284,19 +435,12 @@ if __name__ == "__main__":
             train_loader, 
             val_loader, 
             device,
-            n_epochs, 
+            n_epochs,
+            args.lr,
             start_context, 
             tokenizer, 
-            verbose=True,
+            eval_period=args.eval_freq,
+            print_sample_period=args.print_sample_period,
+            warmup_steps=args.warmup,
+            model_last_step=max_step_num,
             )
-
-        # epochs_tensor = torch.linspace(0, TRAIN_SETTINGS["num_epochs"], len(train_losses))
-        # plot_losses(epochs_tensor, tokens_seen, train_losses, val_losses)
-        # plt.savefig("loss.pdf")
-
-        # Save and load model
-        torch.save(model.state_dict(), "model.pth")
-
-        # Save number of the last file model was trained on
-        with open("last_file_num.txt", "w") as f:
-            f.write(str(i))

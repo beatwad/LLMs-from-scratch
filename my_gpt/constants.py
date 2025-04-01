@@ -9,10 +9,7 @@ GPT_CONFIG_124M = {
     "flash": True,          # Use Flash Attention or not
 }
 
-TRAIN_SETTINGS = {
-    "learning_rate": 3e-4,
-    "num_epochs": 1,
-    "batch_size": 96,
-    "weight_decay": 0.1,
-    "train_test_ratio": 0.9,
-}
+LAST_FILE_PATH = "data_folder/last_file_num.txt"
+
+
+MODEL_PATH = "data_folder/model.pth"
