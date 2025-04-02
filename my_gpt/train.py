@@ -140,12 +140,13 @@ def train(
         optimizer: Any,
         train_loader: Any, 
         val_loader: Any, 
+        tokenizer: Any,
         device: Any,
         n_epochs: int,
         lr: float,
         start_context: str,
-        tokenizer: str,
         eval_num: int = 10,
+        global_step: int = -1,
         warmup_steps: int = 50,
         model_last_step: int = -1,
         eval_period: int = 100,
@@ -158,7 +159,6 @@ def train(
 
     train_losses, val_losses, track_tokens_seen = [], [], []
     tokens_seen = 0
-    global_step = -1
     
     try:
         for _ in range(n_epochs):
@@ -224,7 +224,6 @@ def train(
                 torch.save(
                     {
                         "model_state_dict": model.state_dict(),
-                        "optimizer_state_dict": optimizer.state_dict(),
                     },
                     file_name,
                 )
@@ -236,7 +235,6 @@ def train(
         torch.save(
             {
                 "model_state_dict": model.state_dict(),
-                "optimizer_state_dict": optimizer.state_dict(),
             },
             file_name,
         )
@@ -367,10 +365,9 @@ if __name__ == "__main__":
     model_name = f"model_pg_{max_step_num}.pth" if max_step_num > 0 else ""
 
     if model_name:
-        checkpoint = torch.load(model_dir / model_name, map_location=device)
-        
+        print(f"Loading model from {model_dir / model_name}")
+        checkpoint = torch.load(model_dir / model_name, map_location=device, weights_only=True)
         state_dict = checkpoint["model_state_dict"]
-
         # Remove "_orig_mod." prefix from keys
         model_state_dict = {}
         for k, v in state_dict.items():
@@ -378,19 +375,6 @@ if __name__ == "__main__":
             model_state_dict[new_key] = v
 
         model.load_state_dict(model_state_dict)
-        
-        # Load optimizer state if it exists
-        if "optimizer_state_dict" in checkpoint:
-            optimizer_state_dict = checkpoint["optimizer_state_dict"]
-            # Move optimizer state to the correct device
-            for state in optimizer_state_dict.values():
-                # import code; code.interact(local=dict(globals(), **locals()))
-                if isinstance(state, dict):
-                    for k, v in state.items():
-                        if isinstance(v, torch.Tensor):
-                            state[k] = v.to(device)
-            optimizer.load_state_dict(optimizer_state_dict)
-            print("Loaded optimizer state from checkpoint")
 
     model.to(device).to(torch.bfloat16)
     model = torch.compile(model)
@@ -410,6 +394,7 @@ if __name__ == "__main__":
         quit()
     print("Total files:", total_files)
     all_files.sort()
+    gloabl_step = -1
     
     # Iterate over the books in the training corpus
     for index, file_path in tqdm(enumerate(all_files)):
@@ -442,19 +427,22 @@ if __name__ == "__main__":
             )
 
         # Train model on file
-        train_losses, val_losses, tokens_seen = train(
+        train_losses, val_losses, tokens_seen, gloabl_step = train(
             model, 
             optimizer,
             train_loader, 
-            val_loader, 
+            val_loader,
+            tokenizer,
             device,
             n_epochs,
             args.lr,
             start_context, 
-            tokenizer, 
-            eval_period=args.eval_freq,
-            print_sample_period=args.print_sample_period,
+            eval_num=10,
+            global_step=gloabl_step,
             warmup_steps=args.warmup,
             model_last_step=max_step_num,
+            eval_period=args.eval_freq,
+            print_sample_period=args.print_sample_period,
+            save_ckpt_period=1000,
             model_dir=model_dir,
             )

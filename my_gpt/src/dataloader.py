@@ -18,7 +18,7 @@ class GPTDatasetV1(Dataset):
 
 def get_cache_path(txt, max_length, stride):
     # Create a unique hash for the input parameters
-    params = f"{txt[:100]}_{max_length}_{stride}".encode('utf-8')
+    params = f"{txt[:50]}_{txt[-50:]}_{max_length}_{stride}".encode('utf-8')
     hash_value = hashlib.md5(params).hexdigest()
     return f"tokenized_{hash_value}.pkl"
 
