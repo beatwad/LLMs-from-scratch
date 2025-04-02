@@ -3,14 +3,13 @@
 #   - https://www.manning.com/books/build-a-large-language-model-from-scratch
 # Code: https://github.com/rasbt/LLMs-from-scratch
 
+import chainlit
 import tiktoken
 import torch
-import chainlit
-
 from previous_chapters import (
+    GPTModel,
     download_and_load_gpt2,
     generate,
-    GPTModel,
     load_weights_into_gpt,
     text_to_token_ids,
     token_ids_to_text,
@@ -29,10 +28,10 @@ def get_model_and_tokenizer():
     CHOOSE_MODEL = "gpt2-small (124M)"  # Optionally replace with another model from the model_configs dir below
 
     BASE_CONFIG = {
-        "vocab_size": 50257,     # Vocabulary size
+        "vocab_size": 50257,  # Vocabulary size
         "context_length": 1024,  # Context length
-        "drop_rate": 0.0,        # Dropout rate
-        "qkv_bias": True         # Query-key-value bias
+        "drop_rate": 0.0,  # Dropout rate
+        "qkv_bias": True,  # Query-key-value bias
     }
 
     model_configs = {
@@ -69,11 +68,13 @@ async def main(message: chainlit.Message):
     """
     token_ids = generate(  # function uses `with torch.no_grad()` internally already
         model=model,
-        idx=text_to_token_ids(message.content, tokenizer).to(device),  # The user text is provided via as `message.content`
+        idx=text_to_token_ids(message.content, tokenizer).to(
+            device
+        ),  # The user text is provided via as `message.content`
         max_new_tokens=50,
         context_size=model_config["context_length"],
         top_k=1,
-        temperature=0.0
+        temperature=0.0,
     )
 
     text = token_ids_to_text(token_ids, tokenizer)

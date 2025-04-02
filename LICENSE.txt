@@ -24,8 +24,8 @@
       "You" (or "Your") shall mean an individual or Legal Entity
       exercising permissions granted by this License.
 
-      "Source" form shall mean the preferred form for making modifications, 
-      explicitly excluding any books specific to this software and any related images, 
+      "Source" form shall mean the preferred form for making modifications,
+      explicitly excluding any books specific to this software and any related images,
       and includes but is not limited to software source code,
       documentation source (excluding books and images related to this software),
       and configuration files.

@@ -4,11 +4,12 @@
 # Code: https://github.com/rasbt/LLMs-from-scratch
 
 import pandas as pd
+
+# from sklearn.metrics import balanced_accuracy_score
+from sklearn.dummy import DummyClassifier
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
-# from sklearn.metrics import balanced_accuracy_score
-from sklearn.dummy import DummyClassifier
 
 
 def load_dataframes():

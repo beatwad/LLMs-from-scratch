@@ -1,18 +1,20 @@
 """My implementation of BPE tokenizer + GPT-4 compatable BPE tokenizer"""
 
-import yaml
 from typing import List, Tuple
-from tqdm.auto import tqdm
+
 import regex as re
 import tiktoken
-
+import yaml
+from tqdm.auto import tqdm
 
 GPT4_SPLIT_PATTERN = r"""'(?i:[sdmt]|ll|ve|re)|[^\r\n\p{L}\p{N}]?+\p{L}+|\p{N}{1,3}| ?[^\s\p{L}\p{N}]++[\r\n]*|\s*[\r\n]|\s+(?!\S)|\s+"""
-MERGES_PATH="data/merges.yaml"
-VOCAB_PATH="data/vocab.yaml"
+MERGES_PATH = "data/merges.yaml"
+VOCAB_PATH = "data/vocab.yaml"
 
-class RegexTokenizer():
+
+class RegexTokenizer:
     """Basic tokenizer which uses GPT4 string split pattern"""
+
     def __init__(self):
         self._load_merges_vocab(MERGES_PATH, VOCAB_PATH)
         self._pat = re.compile(GPT4_SPLIT_PATTERN)
@@ -35,14 +37,16 @@ class RegexTokenizer():
             self.merges[pair] = idx
             self.vocab[idx] = self.vocab[pair[0]] + self.vocab[pair[1]]
             if verbose:
-                print(f"{pair} -> {idx} ({self.vocab[idx].decode('utf-8', errors='replace')} has {stats[pair]} of occurencies)")
+                print(
+                    f"{pair} -> {idx} ({self.vocab[idx].decode('utf-8', errors='replace')} has {stats[pair]} of occurencies)"
+                )
         self._save_merges_vocab(MERGES_PATH, VOCAB_PATH)
 
     def encode(self, text: str) -> List[int]:
         tokens = []
         words = self._prepocess(text)
         for word in words:
-            text_bytes = list(word.encode("utf-8")) 
+            text_bytes = list(word.encode("utf-8"))
             tokens.extend(self._encode_chunk(text_bytes))
         return tokens
 
@@ -50,11 +54,11 @@ class RegexTokenizer():
         tokens = b"".join(self.vocab[t] for t in tokens)
         text = tokens.decode("utf-8", errors="replace")
         return text
-    
+
     def _prepocess(self, text: str) -> List[str]:
         words = self._pat.findall(text)
         return words
-    
+
     def _encode_chunk(self, text_bytes: List[str]) -> List[int]:
         while len(text_bytes) >= 2:
             stats = self._get_stats(text_bytes)
@@ -66,7 +70,7 @@ class RegexTokenizer():
             idx = self.merges[pair]
             text_bytes = self._merge(text_bytes, pair, idx)
         return text_bytes
-    
+
     def _get_stats(self, tokens: List[int]) -> List[int]:
         stats = {}
         for pair in zip(tokens, tokens[1:]):
@@ -77,14 +81,14 @@ class RegexTokenizer():
         new_ids = []
         i = 0
         while i < len(ids):
-            if i < len(ids) - 1 and ids[i] == pair[0] and ids[i+1] == pair[1]:
+            if i < len(ids) - 1 and ids[i] == pair[0] and ids[i + 1] == pair[1]:
                 new_ids.append(idx)
                 i += 2
             else:
                 new_ids.append(ids[i])
                 i += 1
         return new_ids
-    
+
     def _save_merges_vocab(self, merges_path: str, vocab_path: str) -> None:
         with open(merges_path, "w") as f:
             inverse_merges = {v: k for k, v in self.merges.items()}
@@ -104,30 +108,31 @@ class RegexTokenizer():
                 self.vocab = yaml.safe_load(f)
         except FileNotFoundError:
             self.vocab = {idx: bytes([idx]) for idx in range(256)}
-    
-    
+
+
 class GPT4Tokenizer(RegexTokenizer):
     """Reproduction of GPT-4 tokenizer"""
+
     def __init__(self):
         enc = tiktoken.get_encoding("cl100k_base")
-        mergeable_ranks = enc._mergeable_ranks 
+        mergeable_ranks = enc._mergeable_ranks
         self.merges = self.recover_merges(mergeable_ranks)
         self.vocab = {idx: bytes([idx]) for idx in range(256)}
         for pair, idx in self.merges.items():
             self.vocab[idx] = self.vocab[pair[0]] + self.vocab[pair[1]]
         # OpenAI for unknown reason shuffle bytes, so these two dicts are used for forward and inverse shuffling
         self.byte_shuffle = {i: enc._mergeable_ranks[bytes([i])] for i in range(256)}
-        self.inverse_byte_shuffle = {enc._mergeable_ranks[bytes([i])]:i for i in range(256)}
+        self.inverse_byte_shuffle = {enc._mergeable_ranks[bytes([i])]: i for i in range(256)}
         self._pat = re.compile(GPT4_SPLIT_PATTERN)
-    
+
     def train(self, text, vocab_size, verbose=False):
         raise NotImplementedError
-    
+
     def encode(self, text: str) -> List[int]:
         tokens = []
         words = self._prepocess(text)
         for word in words:
-            text_bytes = list(word.encode("utf-8")) 
+            text_bytes = list(word.encode("utf-8"))
             text_bytes = bytes(self.byte_shuffle[b] for b in text_bytes)
             tokens.extend(self._encode_chunk(text_bytes))
         return tokens
@@ -137,7 +142,7 @@ class GPT4Tokenizer(RegexTokenizer):
         tokens = bytes([self.inverse_byte_shuffle[t] for t in tokens])
         text = tokens.decode("utf-8", errors="replace")
         return text
-    
+
     @staticmethod
     def bpe(mergeable_ranks, token, max_rank):
         """Helper function used in get_gpt4_merges() to reconstruct the merges forest"""
@@ -153,7 +158,7 @@ class GPT4Tokenizer(RegexTokenizer):
             if min_rank is None or (max_rank is not None and min_rank >= max_rank):
                 break
             assert min_idx is not None
-            parts = parts[:min_idx] + [parts[min_idx] + parts[min_idx + 1]] + parts[min_idx + 2:]
+            parts = parts[:min_idx] + [parts[min_idx] + parts[min_idx + 1]] + parts[min_idx + 2 :]
         return parts
 
     def recover_merges(self, mergeable_ranks):
@@ -167,7 +172,7 @@ class GPT4Tokenizer(RegexTokenizer):
         merges = {}
         for token, rank in mergeable_ranks.items():
             if len(token) == 1:
-                continue # skip raw bytes
+                continue  # skip raw bytes
             pair = tuple(self.bpe(mergeable_ranks, token, max_rank=rank))
             assert len(pair) == 2
             # recover the integer ranks of the pair
@@ -177,18 +182,18 @@ class GPT4Tokenizer(RegexTokenizer):
         return merges
 
 
-if __name__ == "__main__":        
+if __name__ == "__main__":
     vocab_size = 500
     with open("taylorswift.txt") as f:
         text = f.read()
 
     regex_tokenizer = RegexTokenizer()
-    enc = tiktoken.get_encoding("cl100k_base") # this is the GPT-4 tokenizer
+    enc = tiktoken.get_encoding("cl100k_base")  # this is the GPT-4 tokenizer
     gpt4_tokenizer = GPT4Tokenizer()
 
     if not regex_tokenizer.merges:
         regex_tokenizer.train(text, vocab_size, verbose=False)
-    
+
     text = "hello world!!!? (안녕하세요!) lol123 😉"
     ids1 = regex_tokenizer.encode(text)
     assert text == regex_tokenizer.decode(ids1)

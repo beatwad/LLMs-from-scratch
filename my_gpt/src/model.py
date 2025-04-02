@@ -1,6 +1,7 @@
+from typing import Any, Dict
+
 import torch
 import torch.nn as nn
-from typing import Any, Dict
 from constants import GPT_CONFIG_124M
 
 
@@ -48,7 +49,7 @@ class TransformerBlock(nn.Module):
         x = self.drp(x)
         x = x + shortcut
         return x
-    
+
 
 class MultiHeadAttention(nn.Module):
     def __init__(self, cfg: Dict[str, Any]):
@@ -60,35 +61,52 @@ class MultiHeadAttention(nn.Module):
         self.context_len = cfg["context_length"]
         self.qkv_bias = cfg["qkv_bias"]
         self.flash = cfg["flash"]
-        
+
         self.attn = nn.Linear(self.attn_dim, self.attn_dim * 3, bias=self.qkv_bias)
         self.dropout = nn.Dropout(self.drop_rate)
-        self.out_proj = nn.Linear(self.attn_dim, self.attn_dim)  # Linear layer to combine head outputs
+        self.out_proj = nn.Linear(
+            self.attn_dim, self.attn_dim
+        )  # Linear layer to combine head outputs
 
-        self.register_buffer("mask", torch.tril(torch.ones(self.context_len, self.context_len)).view(1, 1, self.context_len, self.context_len))
-        
-    def forward(self, x): # (batch_size, num_tokens)
-        batch_size, num_tokens, _  = x.shape
-        
-        attn = self.attn(x) # (batch_size, num_tokens, attn_dim * 3)
-        attn = attn.view(batch_size, num_tokens, self.n_heads, self.head_dim * 3).transpose(2, 1)  # (batch_size, n_heads, num_tokens, head_dim * 3)
-        Q, K, V = torch.split(attn, self.head_dim, dim=-1) # (batch_size, num_tokens, n_heads, head_dim)
- 
+        self.register_buffer(
+            "mask",
+            torch.tril(torch.ones(self.context_len, self.context_len)).view(
+                1, 1, self.context_len, self.context_len
+            ),
+        )
+
+    def forward(self, x):  # (batch_size, num_tokens)
+        batch_size, num_tokens, _ = x.shape
+
+        attn = self.attn(x)  # (batch_size, num_tokens, attn_dim * 3)
+        attn = attn.view(batch_size, num_tokens, self.n_heads, self.head_dim * 3).transpose(
+            2, 1
+        )  # (batch_size, n_heads, num_tokens, head_dim * 3)
+        Q, K, V = torch.split(
+            attn, self.head_dim, dim=-1
+        )  # (batch_size, num_tokens, n_heads, head_dim)
+
         if self.flash:
             # efficient attention using Flash Attention CUDA kernels
-            out = torch.nn.functional.scaled_dot_product_attention(Q, K, V, attn_mask=None, dropout_p=self.drop_rate, is_causal=True)
+            out = torch.nn.functional.scaled_dot_product_attention(
+                Q, K, V, attn_mask=None, dropout_p=self.drop_rate, is_causal=True
+            )
         else:
-            attn = Q @ K.transpose(-2, -1) * self.head_dim ** -0.5  # (batch_size, n_heads, num_tokens, num_tokens)
-            attn = attn.masked_fill((self.mask==0)[:, :, :num_tokens, :num_tokens], float("-inf"))
+            attn = (
+                Q @ K.transpose(-2, -1) * self.head_dim**-0.5
+            )  # (batch_size, n_heads, num_tokens, num_tokens)
+            attn = attn.masked_fill((self.mask == 0)[:, :, :num_tokens, :num_tokens], float("-inf"))
             attn = torch.softmax(attn, dim=-1)
             attn = self.dropout(attn)
             out = attn @ V
-        
-        out = out.transpose(1, 2) # (batch_size, num_tokens, n_heads, head_dim)
+
+        out = out.transpose(1, 2)  # (batch_size, num_tokens, n_heads, head_dim)
         # ensure that a tensor's memory is stored in a contiguous block
-        out = out.contiguous().view(batch_size, num_tokens, self.attn_dim) # (batch_size, num_tokens, attn_dim)
+        out = out.contiguous().view(
+            batch_size, num_tokens, self.attn_dim
+        )  # (batch_size, num_tokens, attn_dim)
         out = self.out_proj(out)
-        
+
         return out
 
 
@@ -99,8 +117,8 @@ class FeedForwardNetwork(nn.Module):
             nn.Linear(cfg["emb_dim"], 4 * cfg["emb_dim"]),
             GELU(),
             nn.Linear(4 * cfg["emb_dim"], cfg["emb_dim"]),
-            )
-        
+        )
+
     def forward(self, x):
         return self.layers(x)
 
@@ -125,4 +143,14 @@ class GELU(nn.Module):
         super().__init__()
 
     def forward(self, x):
-        return 0.5 * x * (1 + torch.tanh(torch.sqrt(torch.torch.tensor(2.0/torch.pi)) * (x + 0.044715 * torch.pow(x, 3))))
+        return (
+            0.5
+            * x
+            * (
+                1
+                + torch.tanh(
+                    torch.sqrt(torch.torch.tensor(2.0 / torch.pi))
+                    * (x + 0.044715 * torch.pow(x, 3))
+                )
+            )
+        )

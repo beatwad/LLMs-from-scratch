@@ -3,19 +3,13 @@
 #   - https://www.manning.com/books/build-a-large-language-model-from-scratch
 # Code: https://github.com/rasbt/LLMs-from-scratch
 
-from pathlib import Path
 import sys
+from pathlib import Path
 
+import chainlit
 import tiktoken
 import torch
-import chainlit
-
-from previous_chapters import (
-    generate,
-    GPTModel,
-    text_to_token_ids,
-    token_ids_to_text,
-)
+from previous_chapters import GPTModel, generate, text_to_token_ids, token_ids_to_text
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -27,13 +21,13 @@ def get_model_and_tokenizer():
     """
 
     GPT_CONFIG_355M = {
-        "vocab_size": 50257,     # Vocabulary size
+        "vocab_size": 50257,  # Vocabulary size
         "context_length": 1024,  # Shortened context length (orig: 1024)
-        "emb_dim": 1024,         # Embedding dimension
-        "n_heads": 16,           # Number of attention heads
-        "n_layers": 24,          # Number of layers
-        "drop_rate": 0.0,        # Dropout rate
-        "qkv_bias": True         # Query-key-value bias
+        "emb_dim": 1024,  # Embedding dimension
+        "n_heads": 16,  # Number of attention heads
+        "n_layers": 24,  # Number of layers
+        "drop_rate": 0.0,  # Dropout rate
+        "qkv_bias": True,  # Query-key-value bias
     }
 
     tokenizer = tiktoken.get_encoding("gpt2")
@@ -55,7 +49,7 @@ def get_model_and_tokenizer():
 
 
 def extract_response(response_text, input_text):
-    return response_text[len(input_text):].replace("### Response:", "").strip()
+    return response_text[len(input_text) :].replace("### Response:", "").strip()
 
 
 # Obtain the necessary tokenizer and model files for the chainlit function below
@@ -79,10 +73,12 @@ async def main(message: chainlit.Message):
 
     token_ids = generate(  # function uses `with torch.no_grad()` internally already
         model=model,
-        idx=text_to_token_ids(prompt, tokenizer).to(device),  # The user text is provided via as `message.content`
+        idx=text_to_token_ids(prompt, tokenizer).to(
+            device
+        ),  # The user text is provided via as `message.content`
         max_new_tokens=35,
         context_size=model_config["context_length"],
-        eos_id=50256
+        eos_id=50256,
     )
 
     text = token_ids_to_text(token_ids, tokenizer)

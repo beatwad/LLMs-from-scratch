@@ -5,20 +5,20 @@
 
 
 import os
+
+# NEW imports (see Appendix A):
+import platform
 import time
 import urllib.request
 
 import matplotlib.pyplot as plt
+import tiktoken
 import torch
 import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader
-import tiktoken
-
-# NEW imports (see Appendix A):
-import platform
-from torch.utils.data.distributed import DistributedSampler
+from torch.distributed import destroy_process_group, init_process_group
 from torch.nn.parallel import DistributedDataParallel as DDP
-from torch.distributed import init_process_group, destroy_process_group
+from torch.utils.data import DataLoader, Dataset
+from torch.utils.data.distributed import DistributedSampler
 
 
 # NEW: function to initialize a distributed process group (1 process / GPU)
@@ -65,8 +65,8 @@ class GPTDatasetV1(Dataset):
 
         # Use a sliding window to chunk the book into overlapping sequences of max_length
         for i in range(0, len(token_ids) - max_length, stride):
-            input_chunk = token_ids[i:i + max_length]
-            target_chunk = token_ids[i + 1: i + max_length + 1]
+            input_chunk = token_ids[i : i + max_length]
+            target_chunk = token_ids[i + 1 : i + max_length + 1]
             self.input_ids.append(torch.tensor(input_chunk))
             self.target_ids.append(torch.tensor(target_chunk))
 
@@ -79,8 +79,9 @@ class GPTDatasetV1(Dataset):
 
 # NEW: Modify to set shuffle=False and use a sampler
 # (See Appendix A):
-def create_dataloader_v1(txt, batch_size=4, max_length=256,
-                         stride=128, drop_last=True, num_workers=0):
+def create_dataloader_v1(
+    txt, batch_size=4, max_length=256, stride=128, drop_last=True, num_workers=0
+):
     # Initialize the tokenizer
     tokenizer = tiktoken.get_encoding("gpt2")
 
@@ -96,7 +97,7 @@ def create_dataloader_v1(txt, batch_size=4, max_length=256,
         num_workers=num_workers,
         pin_memory=True,
         # NEW: chunk batches across GPUs without overlapping samples:
-        sampler=DistributedSampler(dataset)  # NEW
+        sampler=DistributedSampler(dataset),  # NEW
     )
     return dataloader
 
@@ -133,13 +134,16 @@ class PyTorchMultiHeadAttention(nn.Module):
         # (3, b, num_heads, num_tokens, head_dim) -> 3 times (b, num_heads, num_tokens, head_dim)
         queries, keys, values = qkv
 
-        use_dropout = 0. if not self.training else self.dropout
+        use_dropout = 0.0 if not self.training else self.dropout
 
         context_vec = nn.functional.scaled_dot_product_attention(
-            queries, keys, values, attn_mask=None, dropout_p=use_dropout, is_causal=True)
+            queries, keys, values, attn_mask=None, dropout_p=use_dropout, is_causal=True
+        )
 
         # Combine heads, where self.d_out = self.num_heads * self.head_dim
-        context_vec = context_vec.transpose(1, 2).contiguous().view(batch_size, num_tokens, self.d_out)
+        context_vec = (
+            context_vec.transpose(1, 2).contiguous().view(batch_size, num_tokens, self.d_out)
+        )
 
         context_vec = self.proj(context_vec)
 
@@ -172,7 +176,8 @@ class TransformerBlock(nn.Module):
             d_out=cfg["emb_dim"],
             num_heads=cfg["n_heads"],
             dropout=cfg["drop_rate"],
-            qkv_bias=cfg["qkv_bias"])
+            qkv_bias=cfg["qkv_bias"],
+        )
         self.ff = FeedForward(cfg)
         self.norm1 = nn.LayerNorm(cfg["emb_dim"])
         self.norm2 = nn.LayerNorm(cfg["emb_dim"])
@@ -182,7 +187,7 @@ class TransformerBlock(nn.Module):
         # Shortcut connection for attention block
         shortcut = x
         x = self.norm1(x)
-        x = self.att(x)   # Shape [batch_size, num_tokens, emb_size]
+        x = self.att(x)  # Shape [batch_size, num_tokens, emb_size]
         x = self.drop_shortcut(x)
         x = x + shortcut  # Add the original input back
 
@@ -203,8 +208,7 @@ class GPTModel(nn.Module):
         self.pos_emb = nn.Embedding(cfg["context_length"], cfg["emb_dim"])
         self.drop_emb = nn.Dropout(cfg["drop_rate"])
 
-        self.trf_blocks = nn.Sequential(
-            *[TransformerBlock(cfg) for _ in range(cfg["n_layers"])])
+        self.trf_blocks = nn.Sequential(*[TransformerBlock(cfg) for _ in range(cfg["n_layers"])])
 
         self.final_norm = nn.LayerNorm(cfg["emb_dim"])
         self.out_head = nn.Linear(cfg["emb_dim"], cfg["vocab_size"], bias=False)
@@ -224,7 +228,6 @@ class GPTModel(nn.Module):
 def generate_text_simple(model, idx, max_new_tokens, context_size):
     # idx is (B, T) array of indices in the current context
     for _ in range(max_new_tokens):
-
         # Crop current context if it exceeds the supported context size
         # E.g., if LLM supports only 5 tokens, and the context size is 10
         # then only the last 5 tokens are used as context
@@ -245,6 +248,7 @@ def generate_text_simple(model, idx, max_new_tokens, context_size):
         idx = torch.cat((idx, idx_next), dim=1)  # (batch, n_tokens+1)
 
     return idx
+
 
 #####################################
 # Chapter 5
@@ -270,7 +274,7 @@ def calc_loss_batch(input_batch, target_batch, model, device):
 
 
 def calc_loss_loader(data_loader, model, device, num_batches=None):
-    total_loss = 0.
+    total_loss = 0.0
     if len(data_loader) == 0:
         return float("nan")
     elif num_batches is None:
@@ -299,20 +303,33 @@ def generate_and_print_sample(model, device, start_context):
     model.eval()
 
     # NEW: Modify for DDP
-    context_size = model.module.pos_emb.weight.shape[0] if isinstance(model, DDP) else model.pos_emb.weight.shape[0]
+    context_size = (
+        model.module.pos_emb.weight.shape[0]
+        if isinstance(model, DDP)
+        else model.pos_emb.weight.shape[0]
+    )
     encoded = text_to_token_ids(start_context, tiktoken.get_encoding("gpt2")).to(device)
     with torch.no_grad():
         token_ids = generate_text_simple(
-            model=model, idx=encoded,
-            max_new_tokens=50, context_size=context_size
+            model=model, idx=encoded, max_new_tokens=50, context_size=context_size
         )
         decoded_text = token_ids_to_text(token_ids, tiktoken.get_encoding("gpt2"))
         print(decoded_text.replace("\n", " "))  # Compact print format
     model.train()
 
 
-def train_model_simple_with_timing(model, train_loader, val_loader, optimizer, device,
-                                   num_epochs, eval_freq, eval_iter, start_context, tokenizer):
+def train_model_simple_with_timing(
+    model,
+    train_loader,
+    val_loader,
+    optimizer,
+    device,
+    num_epochs,
+    eval_freq,
+    eval_iter,
+    start_context,
+    tokenizer,
+):
     train_losses, val_losses, track_tokens = [], [], []
     total_tokens, global_step, last_tokens = 0, -1, 0
 
@@ -329,9 +346,9 @@ def train_model_simple_with_timing(model, train_loader, val_loader, optimizer, d
         t_start = torch.cuda.Event(enable_timing=True)
         t_end = torch.cuda.Event(enable_timing=True)
         torch.cuda.synchronize()  # Ensure all prior CUDA operations are done
-        t_start.record()          # Start the timer for the first interval
+        t_start.record()  # Start the timer for the first interval
     else:
-        t0 = time.time()          # Start the timer for the first interval
+        t0 = time.time()  # Start the timer for the first interval
 
     # Main training loop
     for epoch in range(num_epochs):
@@ -378,24 +395,32 @@ def train_model_simple_with_timing(model, train_loader, val_loader, optimizer, d
 
                 # Update cumulative tokens (local) and aggregate globally
                 cumulative_tokens += local_interval
-                local_cum_tensor = torch.tensor([cumulative_tokens], device=device, dtype=torch.float)
+                local_cum_tensor = torch.tensor(
+                    [cumulative_tokens], device=device, dtype=torch.float
+                )
                 global_cum_tensor = local_cum_tensor.clone()
                 torch.distributed.all_reduce(global_cum_tensor, op=torch.distributed.ReduceOp.SUM)
                 global_cumulative_tokens = global_cum_tensor.item()
                 cumulative_time += elapsed
-                global_avg_tps = global_cumulative_tokens / cumulative_time if cumulative_time > 0 else 0
+                global_avg_tps = (
+                    global_cumulative_tokens / cumulative_time if cumulative_time > 0 else 0
+                )
 
                 # Evaluate model performance (this may add overhead)
-                train_loss, val_loss = evaluate_model(model, train_loader, val_loader, device, eval_iter)
+                train_loss, val_loss = evaluate_model(
+                    model, train_loader, val_loader, device, eval_iter
+                )
                 train_losses.append(train_loss)
                 val_losses.append(val_loss)
                 track_tokens.append(total_tokens)
 
                 # NEW: Only print logs once per GPU (choosing the rank 0 GPU)
                 if rank == 0:
-                    print(f"Ep {epoch+1}, Step {global_step:06d}, "
-                          f"Train: {train_loss:.3f}, Val: {val_loss:.3f}, "
-                          f"Step tok/sec: {round(global_tps)}, Global avg tok/sec: {round(global_avg_tps)}")
+                    print(
+                        f"Ep {epoch+1}, Step {global_step:06d}, "
+                        f"Train: {train_loss:.3f}, Val: {val_loss:.3f}, "
+                        f"Step tok/sec: {round(global_tps)}, Global avg tok/sec: {round(global_avg_tps)}"
+                    )
 
         # NEW Only rank 0 prints the generated sample and memory usage stats
         if rank == 0 and epoch % 5 == 0:
@@ -405,7 +430,7 @@ def train_model_simple_with_timing(model, train_loader, val_loader, optimizer, d
             if torch.cuda.is_available():
                 current_device = torch.cuda.current_device()
                 allocated = torch.cuda.memory_allocated(current_device) / 1024**3  # Convert to GB
-                reserved = torch.cuda.memory_reserved(current_device) / 1024**3    # Convert to GB
+                reserved = torch.cuda.memory_reserved(current_device) / 1024**3  # Convert to GB
 
                 print(f"\nAllocated memory: {allocated:.4f} GB")
                 print(f"Reserved memory: {reserved:.4f} GB\n")
@@ -436,9 +461,9 @@ def plot_losses(epochs_seen, tokens_seen, train_losses, val_losses):
 # Main function calls
 #####################################
 
+
 # NEW: Add rank and world_size
 def main(gpt_config, settings, rank, world_size):
-
     ddp_setup(rank, world_size)  # NEW: initialize process groups
     device = torch.device("cuda", rank)
 
@@ -469,7 +494,7 @@ def main(gpt_config, settings, rank, world_size):
     if rank == 0:
         if not os.path.exists(file_path):
             with urllib.request.urlopen(url) as response:
-                text_data = response.read().decode('utf-8')
+                text_data = response.read().decode("utf-8")
             with open(file_path, "w", encoding="utf-8") as file:
                 file.write(text_data)
 
@@ -490,8 +515,10 @@ def main(gpt_config, settings, rank, world_size):
     # NEW: Wrap model with DDP
     model = DDP(model, device_ids=[rank])
     optimizer = torch.optim.AdamW(
-        model.parameters(), lr=settings["learning_rate"], weight_decay=settings["weight_decay"],
-        fused=True
+        model.parameters(),
+        lr=settings["learning_rate"],
+        weight_decay=settings["weight_decay"],
+        fused=True,
     )
 
     ##############################
@@ -508,7 +535,7 @@ def main(gpt_config, settings, rank, world_size):
         max_length=gpt_config["context_length"],
         stride=gpt_config["context_length"],
         drop_last=True,
-        num_workers=4
+        num_workers=4,
     )
 
     val_loader = create_dataloader_v1(
@@ -517,7 +544,7 @@ def main(gpt_config, settings, rank, world_size):
         max_length=gpt_config["context_length"],
         stride=gpt_config["context_length"],
         drop_last=False,
-        num_workers=4
+        num_workers=4,
     )
 
     ##############################
@@ -536,7 +563,7 @@ def main(gpt_config, settings, rank, world_size):
         eval_freq=5,
         eval_iter=1,
         start_context="Every effort moves you",
-        tokenizer=tokenizer
+        tokenizer=tokenizer,
     )
 
     # NEW: Clean up distributed processes
@@ -546,7 +573,6 @@ def main(gpt_config, settings, rank, world_size):
 
 
 if __name__ == "__main__":
-
     # NEW: Extract rank and world size from environment variables
     if "WORLD_SIZE" in os.environ:
         world_size = int(os.environ["WORLD_SIZE"])
@@ -561,20 +587,20 @@ if __name__ == "__main__":
         rank = 0
 
     GPT_CONFIG_124M = {
-        "vocab_size": 50304,     # Vocabulary size
+        "vocab_size": 50304,  # Vocabulary size
         "context_length": 1024,  # Input tokens per training example
-        "emb_dim": 768,          # Embedding dimension
-        "n_heads": 12,           # Number of attention heads
-        "n_layers": 12,          # Number of layers
-        "drop_rate": 0.1,        # Dropout rate
-        "qkv_bias": False        # Query-key-value bias
+        "emb_dim": 768,  # Embedding dimension
+        "n_heads": 12,  # Number of attention heads
+        "n_layers": 12,  # Number of layers
+        "drop_rate": 0.1,  # Dropout rate
+        "qkv_bias": False,  # Query-key-value bias
     }
 
     OTHER_SETTINGS = {
         "learning_rate": 5e-4,  # * world_size,  # NEW: Increase learning rate to account for multiple GPUs
         "num_epochs": 50,
         "batch_size": 32,
-        "weight_decay": 0.1
+        "weight_decay": 0.1,
     }
 
     ###########################
@@ -582,8 +608,7 @@ if __name__ == "__main__":
     ###########################
 
     train_losses, val_losses, tokens_seen, model = main(
-        GPT_CONFIG_124M, OTHER_SETTINGS,
-        rank, world_size  # NEW
+        GPT_CONFIG_124M, OTHER_SETTINGS, rank, world_size  # NEW
     )
 
     ###########################

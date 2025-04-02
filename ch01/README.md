@@ -26,4 +26,3 @@ As an optional bonus, the following video tutorial provides an overview of the L
 <br>
 
 [![Link to the video](https://img.youtube.com/vi/kPGTx4wcm_w/0.jpg)](https://www.youtube.com/watch?v=kPGTx4wcm_w)
-

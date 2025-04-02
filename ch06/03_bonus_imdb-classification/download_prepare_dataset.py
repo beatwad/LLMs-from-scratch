@@ -8,6 +8,7 @@ import sys
 import tarfile
 import time
 import urllib.request
+
 import pandas as pd
 
 
@@ -48,7 +49,9 @@ def load_dataset_to_dataframe(basepath="aclImdb", labels={"pos": 1, "neg": 0}):
             for file in sorted(os.listdir(path)):
                 with open(os.path.join(path, file), "r", encoding="utf-8") as infile:
                     # Create a DataFrame for each file and add it to the list
-                    data_frames.append(pd.DataFrame({"text": [infile.read()], "label": [labels[label]]}))
+                    data_frames.append(
+                        pd.DataFrame({"text": [infile.read()], "label": [labels[label]]})
+                    )
     # Concatenate all DataFrame chunks together
     df = pd.concat(data_frames, ignore_index=True)
     df = df.sample(frac=1, random_state=123).reset_index(drop=True)  # Shuffle the DataFrame

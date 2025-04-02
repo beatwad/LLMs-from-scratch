@@ -1,5 +1,5 @@
 AWSTemplateFormatVersion: '2010-09-09'
-Description: 'CloudFormation template to create a GPU-enabled Jupyter notebook in SageMaker with an execution role and 
+Description: 'CloudFormation template to create a GPU-enabled Jupyter notebook in SageMaker with an execution role and
 LLMs-from-scratch Repo'
 
 Parameters:
@@ -59,7 +59,7 @@ Resources:
             # Create a startup script that will run in the background
             cat << 'EOF' > /home/ec2-user/SageMaker/setup-environment.sh
             #!/bin/bash
-            
+
             sudo -u ec2-user -i <<'INNEREOF'
             unset SUDO_UID
 
@@ -67,7 +67,7 @@ Resources:
             WORKING_DIR=/home/ec2-user/SageMaker/custom-miniconda
             mkdir -p "$WORKING_DIR"
             wget https://repo.anaconda.com/miniconda/Miniconda3-4.7.12.1-Linux-x86_64.sh -O "$WORKING_DIR/miniconda.sh"
-            bash "$WORKING_DIR/miniconda.sh" -b -u -p "$WORKING_DIR/miniconda" 
+            bash "$WORKING_DIR/miniconda.sh" -b -u -p "$WORKING_DIR/miniconda"
             rm -rf "$WORKING_DIR/miniconda.sh"
 
             # Ensure we're using the Miniconda conda

@@ -1,6 +1,7 @@
+from typing import Any, Dict
+
 import torch
 import torch.nn as nn
-from typing import Any, Dict
 
 
 class Llama3Model(nn.Module):
@@ -8,8 +9,7 @@ class Llama3Model(nn.Module):
         super().__init__()
         self.tok_emb = nn.Embedding(cfg["vocab_size"], cfg["emb_dim"], dtype=cfg["dtype"])
 
-        self.trf_blocks = nn.Sequential(
-            *[TransformerBlock(cfg) for _ in range(cfg["n_layers"])])
+        self.trf_blocks = nn.Sequential(*[TransformerBlock(cfg) for _ in range(cfg["n_layers"])])
 
         self.final_norm = RMSNorm(cfg["emb_dim"], eps=1e-5)
         self.out_head = nn.Linear(cfg["emb_dim"], cfg["vocab_size"], bias=False, dtype=cfg["dtype"])
@@ -33,19 +33,18 @@ class TransformerBlock(nn.Module):
             num_heads=cfg["n_heads"],
             num_kv_groups=cfg["n_kv_groups"],
             rope_base=cfg["rope_base"],
-            rope_config=cfg["rope_freq"], 
-            dtype=cfg["dtype"]
+            rope_config=cfg["rope_freq"],
+            dtype=cfg["dtype"],
         )
         self.ff = FeedForward(cfg)
         self.norm1 = RMSNorm(cfg["emb_dim"], eps=1e-5)
         self.norm2 = RMSNorm(cfg["emb_dim"], eps=1e-5)
 
-
     def forward(self, x):
         # Shortcut connection for attention block
         shortcut = x
         x = self.norm1(x)
-        x = self.att(x.to(torch.bfloat16))   # Shape [batch_size, num_tokens, emb_size]
+        x = self.att(x.to(torch.bfloat16))  # Shape [batch_size, num_tokens, emb_size]
         x = x + shortcut  # Add the original input back
 
         # Shortcut connection for feed-forward block
@@ -55,13 +54,20 @@ class TransformerBlock(nn.Module):
         x = x + shortcut  # Add the original input back
 
         return x
-    
+
+
 class SharedBuffers:
     _buffers = {}
 
     @staticmethod
     def get_buffers(context_length, head_dim, rope_base, freq_config, dtype=torch.float32):
-        key = (context_length, head_dim, rope_base, tuple(freq_config.values()) if freq_config else freq_config, dtype)
+        key = (
+            context_length,
+            head_dim,
+            rope_base,
+            tuple(freq_config.values()) if freq_config else freq_config,
+            dtype,
+        )
 
         if key not in SharedBuffers._buffers:
             # Create or fetch the buffers
@@ -73,20 +79,20 @@ class SharedBuffers:
             SharedBuffers._buffers[key] = (mask, cos, sin)
 
         return SharedBuffers._buffers[key]
-    
+
 
 class GroupedQueryAttention(nn.Module):
     def __init__(
-            self, 
-            d_in, 
-            d_out, 
-            context_length, 
-            num_heads,
-            num_kv_groups,
-            rope_base=10_000,
-            rope_config=None,
-            dtype=None
-        ):
+        self,
+        d_in,
+        d_out,
+        context_length,
+        num_heads,
+        num_kv_groups,
+        rope_base=10_000,
+        rope_config=None,
+        dtype=None,
+    ):
         super().__init__()
         assert d_out % num_heads == 0, "d_out must be divisible by num_heads"
         assert num_heads % num_kv_groups == 0, "num_heads must be divisible by num_kv_groups"  # NEW
@@ -107,9 +113,11 @@ class GroupedQueryAttention(nn.Module):
 
         ############################# NEW  #############################
         # Fetch buffers using SharedBuffers
-        mask, cos, sin = SharedBuffers.get_buffers(context_length, self.head_dim, rope_base, rope_config, dtype)
+        mask, cos, sin = SharedBuffers.get_buffers(
+            context_length, self.head_dim, rope_base, rope_config, dtype
+        )
         ############################# NEW  #############################
-        
+
         self.register_buffer("mask", mask)
         self.register_buffer("cos", cos)
         self.register_buffer("sin", sin)
@@ -137,8 +145,12 @@ class GroupedQueryAttention(nn.Module):
 
         # Expand keys and values to match the number of heads
         # Shape: (b, num_heads, num_tokens, head_dim)
-        keys = keys.repeat_interleave(self.group_size, dim=1)  # Shape: (b, num_heads, num_tokens, head_dim)
-        values = values.repeat_interleave(self.group_size, dim=1)  # Shape: (b, num_heads, num_tokens, head_dim)
+        keys = keys.repeat_interleave(
+            self.group_size, dim=1
+        )  # Shape: (b, num_heads, num_tokens, head_dim)
+        values = values.repeat_interleave(
+            self.group_size, dim=1
+        )  # Shape: (b, num_heads, num_tokens, head_dim)
         # For example, before repeat_interleave along dim=1 (query groups):
         #   [K1, K2]
         # After repeat_interleave (each query group is repeated group_size times):
@@ -156,7 +168,7 @@ class GroupedQueryAttention(nn.Module):
         # Use the mask to fill attention scores
         attn_scores.masked_fill_(mask_bool, -torch.inf)
 
-        attn_weights = torch.softmax(attn_scores / keys.shape[-1]**0.5, dim=-1)
+        attn_weights = torch.softmax(attn_scores / keys.shape[-1] ** 0.5, dim=-1)
         assert keys.shape[-1] == self.head_dim
 
         # Shape: (b, num_tokens, num_heads, head_dim)
@@ -203,12 +215,15 @@ class SiLU(nn.Module):
 
     def forward(self, x):
         return x * torch.sigmoid(x)
-    
+
+
 def precompute_rope_params(head_dim, theta_base=10_000, context_length=4096, freq_config=None):
     assert head_dim % 2 == 0, "Embedding dimension must be even"
 
     # Compute the inverse frequencies
-    inv_freq = 1.0 / (theta_base ** (torch.arange(0, head_dim, 2)[: (head_dim // 2)].float() / head_dim))
+    inv_freq = 1.0 / (
+        theta_base ** (torch.arange(0, head_dim, 2)[: (head_dim // 2)].float() / head_dim)
+    )
 
     # Frequency adjustments
     if freq_config is not None:
@@ -221,13 +236,13 @@ def precompute_rope_params(head_dim, theta_base=10_000, context_length=4096, fre
             wavelen > low_freq_wavelen, inv_freq / freq_config["factor"], inv_freq
         )
 
-        smooth_factor = (freq_config["original_context_length"] / wavelen - freq_config["low_freq_factor"]) / (
-            freq_config["high_freq_factor"] - freq_config["low_freq_factor"]
-        )
+        smooth_factor = (
+            freq_config["original_context_length"] / wavelen - freq_config["low_freq_factor"]
+        ) / (freq_config["high_freq_factor"] - freq_config["low_freq_factor"])
 
-        smoothed_inv_freq = (
-            (1 - smooth_factor) * (inv_freq / freq_config["factor"]) + smooth_factor * inv_freq
-        )
+        smoothed_inv_freq = (1 - smooth_factor) * (
+            inv_freq / freq_config["factor"]
+        ) + smooth_factor * inv_freq
 
         is_medium_freq = (wavelen <= low_freq_wavelen) & (wavelen >= high_freq_wavelen)
         inv_freq_llama = torch.where(is_medium_freq, smoothed_inv_freq, inv_freq_llama)
@@ -268,9 +283,12 @@ def compute_rope(x, cos, sin):
 
     return x_rotated.to(dtype=x.dtype)
 
+
 def assign(left, right, tensor_name="unknown"):
     if left.shape != right.shape:
-        raise ValueError(f"Shape mismatch in tensor '{tensor_name}'. Left: {left.shape}, Right: {right.shape}")
+        raise ValueError(
+            f"Shape mismatch in tensor '{tensor_name}'. Left: {left.shape}, Right: {right.shape}"
+        )
 
     if isinstance(right, torch.Tensor):
         return torch.nn.Parameter(right.clone().detach())
@@ -279,64 +297,71 @@ def assign(left, right, tensor_name="unknown"):
 
 
 def load_weights_into_llama(model, param_config, params):
-    model.tok_emb.weight = assign(model.tok_emb.weight, params["model.embed_tokens.weight"], "model.embed_tokens.weight")
+    model.tok_emb.weight = assign(
+        model.tok_emb.weight, params["model.embed_tokens.weight"], "model.embed_tokens.weight"
+    )
 
     for l in range(param_config["n_layers"]):
-
         # Load attention weights
         model.trf_blocks[l].att.W_query.weight = assign(
             model.trf_blocks[l].att.W_query.weight,
             params[f"model.layers.{l}.self_attn.q_proj.weight"],
-            f"model.layers.{l}.self_attn.q_proj.weight"
+            f"model.layers.{l}.self_attn.q_proj.weight",
         )
         model.trf_blocks[l].att.W_key.weight = assign(
             model.trf_blocks[l].att.W_key.weight,
             params[f"model.layers.{l}.self_attn.k_proj.weight"],
-            f"model.layers.{l}.self_attn.k_proj.weight"
+            f"model.layers.{l}.self_attn.k_proj.weight",
         )
         model.trf_blocks[l].att.W_value.weight = assign(
             model.trf_blocks[l].att.W_value.weight,
             params[f"model.layers.{l}.self_attn.v_proj.weight"],
-            f"model.layers.{l}.self_attn.v_proj.weight"
+            f"model.layers.{l}.self_attn.v_proj.weight",
         )
         model.trf_blocks[l].att.out_proj.weight = assign(
             model.trf_blocks[l].att.out_proj.weight,
             params[f"model.layers.{l}.self_attn.o_proj.weight"],
-            f"model.layers.{l}.self_attn.o_proj.weight"
+            f"model.layers.{l}.self_attn.o_proj.weight",
         )
         model.trf_blocks[l].norm1.weight = assign(
             model.trf_blocks[l].norm1.weight,
             params[f"model.layers.{l}.input_layernorm.weight"],
-            f"model.layers.{l}.input_layernorm.weight"
+            f"model.layers.{l}.input_layernorm.weight",
         )
 
         # Load FeedForward weights
         model.trf_blocks[l].ff.fc1.weight = assign(
             model.trf_blocks[l].ff.fc1.weight,
             params[f"model.layers.{l}.mlp.gate_proj.weight"],
-            f"model.layers.{l}.mlp.gate_proj.weight"
+            f"model.layers.{l}.mlp.gate_proj.weight",
         )
         model.trf_blocks[l].ff.fc2.weight = assign(
             model.trf_blocks[l].ff.fc2.weight,
             params[f"model.layers.{l}.mlp.up_proj.weight"],
-            f"model.layers.{l}.mlp.up_proj.weight"
+            f"model.layers.{l}.mlp.up_proj.weight",
         )
         model.trf_blocks[l].ff.fc3.weight = assign(
             model.trf_blocks[l].ff.fc3.weight,
             params[f"model.layers.{l}.mlp.down_proj.weight"],
-            f"model.layers.{l}.mlp.down_proj.weight"
+            f"model.layers.{l}.mlp.down_proj.weight",
         )
         model.trf_blocks[l].norm2.weight = assign(
             model.trf_blocks[l].norm2.weight,
             params[f"model.layers.{l}.post_attention_layernorm.weight"],
-            f"model.layers.{l}.post_attention_layernorm.weight"
+            f"model.layers.{l}.post_attention_layernorm.weight",
         )
 
     # Load output layer weights
-    model.final_norm.weight = assign(model.final_norm.weight, params["model.norm.weight"], "model.norm.weight")
+    model.final_norm.weight = assign(
+        model.final_norm.weight, params["model.norm.weight"], "model.norm.weight"
+    )
 
     if "lm_head.weight" in params.keys():
-        model.out_head.weight = assign(model.out_head.weight, params["lm_head.weight"], "lm_head.weight")
+        model.out_head.weight = assign(
+            model.out_head.weight, params["lm_head.weight"], "lm_head.weight"
+        )
     else:
-        model.out_head.weight = assign(model.out_head.weight, params["model.embed_tokens.weight"], "model.embed_tokens.weight")
+        model.out_head.weight = assign(
+            model.out_head.weight, params["model.embed_tokens.weight"], "model.embed_tokens.weight"
+        )
         print("Model uses weight tying.")

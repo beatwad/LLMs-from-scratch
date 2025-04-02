@@ -10,4 +10,3 @@ Below is a hands-on video tutorial I recorded to explain the code:
 <br>
 
 [![Link to the video](https://img.youtube.com/vi/PetlIokI9Ao/0.jpg)](https://www.youtube.com/watch?v=PetlIokI9Ao)
-

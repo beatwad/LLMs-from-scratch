@@ -71,10 +71,10 @@ The default threshold is 0.9.
  - The [create-passive-voice-entries.ipynb](create-passive-voice-entries.ipynb) notebook uses OpenAI's GPT-4 to create "passive voice" entries for an instruction dataset, as shown in the example below
 
  ```python
- {  
+ {
     'instruction': 'Identify the verb in the following sentence',
     'input': 'The cat sleeps on the couch.',
     'output': 'The verb in the sentence is "sleeps."',
     'output_2': 'The sentence is "sleeps."'   #  <---- Newly created entry
- }  
+ }
  ```
