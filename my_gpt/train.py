@@ -4,11 +4,13 @@ import torch
 import wandb
 import argparse
 
-from typing import Any, List
+from typing import Any, List, Tuple, Optional, Union
 from pathlib import Path
 from tqdm.auto import tqdm
 from torch.optim import AdamW
 from torch.nn import CrossEntropyLoss
+from torch.utils.data import DataLoader
+from torch import Tensor
 
 from constants import GPT_CONFIG_124M
 from src.model import GPTModel
@@ -17,33 +19,96 @@ from src.dataloader import create_dataloader
 import tiktoken
 
 
-def read_text_file(file_path):
+def read_text_file(file_path: str) -> str:
+    """Read text data from a file.
+
+    Parameters
+    ----------
+    file_path : str
+        Path to the text file to read.
+
+    Returns
+    -------
+    str
+        The contents of the text file as a string.
+    """
     with open(file_path, "r", encoding="utf-8") as file:
         text_data = file.read()
     return text_data
 
 
-def text_2_token_ids(text: str, tokenizer: Any) -> torch.tensor:
+def text_2_token_ids(text: str, tokenizer: Any) -> Tensor:
+    """Convert text to token IDs using the provided tokenizer.
+
+    Parameters
+    ----------
+    text : str
+        Input text to tokenize.
+    tokenizer : Any
+        Tokenizer object that implements encode method.
+
+    Returns
+    -------
+    Tensor
+        Tensor of token IDs with shape (1, sequence_length).
+    """
     encoded = tokenizer.encode(text)
     encoded_tensor = torch.tensor(encoded).unsqueeze(0)
     return encoded_tensor
 
 
-def token_ids_2_text(ids: torch.tensor, tokenizer: Any) -> str:
+def token_ids_2_text(ids: Tensor, tokenizer: Any) -> str:
+    """Convert token IDs back to text using the provided tokenizer.
+
+    Parameters
+    ----------
+    ids : Tensor
+        Tensor of token IDs to decode.
+    tokenizer : Any
+        Tokenizer object that implements decode method.
+
+    Returns
+    -------
+    str
+        Decoded text from the token IDs.
+    """
     decoded = tokenizer.decode(ids.squeeze(0).tolist())
     return decoded
 
 
 def generate_text(
         model: Any, 
-        ids: List[int], 
+        ids: Tensor, 
         context_size: int, 
         num_steps: int = 30, 
         temperature: float = 0,
-        top_k: int = None,
-        top_p: int = None,
-        ) -> List[int]:
-    
+        top_k: Optional[int] = None,
+        top_p: Optional[float] = None,
+        ) -> Tensor:
+    """Generate text from input token IDs using the provided model.
+
+    Parameters
+    ----------
+    model : Any
+        The language model to use for generation.
+    ids : Tensor
+        Initial token IDs to start generation from.
+    context_size : int
+        Maximum context length for the model.
+    num_steps : int, optional
+        Number of tokens to generate, by default 30.
+    temperature : float, optional
+        Temperature parameter for sampling, by default 0.
+    top_k : Optional[int], optional
+        Top-k sampling parameter, by default None.
+    top_p : Optional[float], optional
+        Top-p (nucleus) sampling parameter, by default None.
+
+    Returns
+    -------
+    Tensor
+        Generated token IDs including the input context.
+    """
     for _ in range(num_steps):
         ids = ids[:, -context_size:]
         
@@ -82,7 +147,27 @@ def generate_text(
     return ids
 
 
-def calc_loss(model, dataloader, device, loss_fn, eval_num) -> float:
+def calc_loss(model: Any, dataloader: DataLoader, device: torch.device, loss_fn: Any, eval_num: int) -> float:
+    """Calculate the average loss over a specified number of batches.
+
+    Parameters
+    ----------
+    model : Any
+        The model to evaluate.
+    dataloader : DataLoader
+        DataLoader containing the evaluation data.
+    device : torch.device
+        Device to perform computations on.
+    loss_fn : Any
+        Loss function to use for evaluation.
+    eval_num : int
+        Number of batches to evaluate.
+
+    Returns
+    -------
+    float
+        Average loss over the evaluated batches.
+    """
     i, loss = 0, 0
     for train, test in dataloader:
         train, test = train.to(device), test.to(device)
@@ -99,7 +184,29 @@ def calc_loss(model, dataloader, device, loss_fn, eval_num) -> float:
     return loss / i
 
 
-def evaluate_model(model, train_loader, val_loader, device, loss_fn, eval_num) -> float:
+def evaluate_model(model: Any, train_loader: DataLoader, val_loader: DataLoader, device: torch.device, loss_fn: Any, eval_num: int) -> Tuple[float, float]:
+    """Evaluate the model on both training and validation data.
+
+    Parameters
+    ----------
+    model : Any
+        The model to evaluate.
+    train_loader : DataLoader
+        DataLoader containing training data.
+    val_loader : DataLoader
+        DataLoader containing validation data.
+    device : torch.device
+        Device to perform computations on.
+    loss_fn : Any
+        Loss function to use for evaluation.
+    eval_num : int
+        Number of batches to evaluate.
+
+    Returns
+    -------
+    Tuple[float, float]
+        Tuple containing (train_loss, val_loss).
+    """
     model.eval()
     with torch.no_grad():
         train_loss = calc_loss(model, train_loader, device, loss_fn, eval_num)
@@ -109,14 +216,33 @@ def evaluate_model(model, train_loader, val_loader, device, loss_fn, eval_num) -
 
 
 def generate_and_print_sample(
-        model, 
-        tokenizer, 
-        device, 
-        start_context, 
-        temperature=1.0, 
-        top_k=50, 
-        top_p=0.95,
-        ):
+        model: Any, 
+        tokenizer: Any, 
+        device: torch.device, 
+        start_context: str, 
+        temperature: float = 1.0, 
+        top_k: int = 50, 
+        top_p: float = 0.95,
+        ) -> None:
+    """Generate and print a sample text using the model.
+
+    Parameters
+    ----------
+    model : Any
+        The model to use for generation.
+    tokenizer : Any
+        Tokenizer for encoding/decoding text.
+    device : torch.device
+        Device to perform computations on.
+    start_context : str
+        Initial text to start generation from.
+    temperature : float, optional
+        Temperature parameter for sampling, by default 1.0.
+    top_k : int, optional
+        Top-k sampling parameter, by default 50.
+    top_p : float, optional
+        Top-p (nucleus) sampling parameter, by default 0.95.
+    """
     model.eval()
     context_size = model.pos_emb.weight.shape[0]
     encoded = text_2_token_ids(start_context, tokenizer).to(device)
@@ -137,28 +263,71 @@ def generate_and_print_sample(
 
 def train(
         model: Any, 
-        optimizer: Any,
-        train_loader: Any, 
-        val_loader: Any, 
+        optimizer: torch.optim.Optimizer,
+        train_loader: DataLoader, 
+        val_loader: DataLoader, 
         tokenizer: Any,
-        device: Any,
+        device: torch.device,
         n_epochs: int,
         lr: float,
         start_context: str,
         eval_num: int = 10,
         global_step: int = -1,
-        warmup_steps: int = 50,
+        tokens_seen: int = 0,
+        warmup_steps: int = 100,
         model_last_step: int = -1,
         eval_period: int = 100,
         print_sample_period: int = 1000,
         save_ckpt_period: int = 1000,
-        model_dir: str = "model_checkpoints",
-        ):
+        model_dir: Union[str, Path] = "model_checkpoints",
+        ) -> Tuple[int, int]:
+    """Train the model with the specified parameters.
 
+    Parameters
+    ----------
+    model : Any
+        The model to train.
+    optimizer : torch.optim.Optimizer
+        Optimizer for training.
+    train_loader : DataLoader
+        DataLoader containing training data.
+    val_loader : DataLoader
+        DataLoader containing validation data.
+    tokenizer : Any
+        Tokenizer for text processing.
+    device : torch.device
+        Device to perform computations on.
+    n_epochs : int
+        Number of epochs to train.
+    lr : float
+        Learning rate.
+    start_context : str
+        Initial text for text sample generation.
+    eval_num : int, optional
+        Number of batches to evaluate on, by default 10.
+    global_step : int, optional
+        Starting global step counter, by default -1.
+    tokens_seen : int, optional
+        Starting number of token that was seen by model, by default 0.
+    warmup_steps : int, optional
+        Number of warmup steps, by default 100.
+    model_last_step : int, optional
+        Last training step of the model, is used to continue training from the last checkpoint, by default -1.
+    eval_period : int, optional
+        Steps between evaluations, by default 100.
+    print_sample_period : int, optional
+        Steps between printing text samples, by default 1000.
+    save_ckpt_period : int, optional
+        Steps between saving checkpoints, by default 1000.
+    model_dir : Union[str, Path], optional
+        Directory to save model checkpoints, by default "model_checkpoints".
+
+    Returns
+    -------
+    Tuple[List[float], List[float], List[int]]
+        Tuple containing (gloabl_step, tokens_seen).
+    """
     loss_fn = CrossEntropyLoss()
-
-    train_losses, val_losses, track_tokens_seen = [], [], []
-    tokens_seen = 0
     
     try:
         for _ in range(n_epochs):
@@ -202,9 +371,6 @@ def train(
                 
                 if global_step % eval_period == 0:
                     train_loss, val_loss = evaluate_model(model, train_loader, val_loader, device, loss_fn, eval_num)
-                    train_losses.append(train_loss)
-                    val_losses.append(val_loss)
-                    track_tokens_seen.append(tokens_seen)
                     print(f"Train loss: {train_loss:.4f}, val loss: {val_loss:.4f}")
                     
                     # Log evaluation metrics to wandb
@@ -240,10 +406,26 @@ def train(
         )
         raise KeyboardInterrupt
 
-    return train_losses, val_losses, track_tokens_seen
+    return gloabl_step, tokens_seen
 
 
-def get_lr(step, warmup_steps, max_lr):
+def get_lr(step: int, warmup_steps: int, max_lr: float) -> float:
+    """Calculate learning rate based on current step with warmup and cosine decay.
+
+    Parameters
+    ----------
+    step : int
+        Current training step.
+    warmup_steps : int
+        Number of warmup steps.
+    max_lr : float
+        Maximum learning rate.
+
+    Returns
+    -------
+    float
+        Current learning rate.
+    """
     min_lr = 0.1 * max_lr
     max_steps = 100 * warmup_steps
     
@@ -394,8 +576,9 @@ if __name__ == "__main__":
         quit()
     print("Total files:", total_files)
     all_files.sort()
-    gloabl_step = -1
     
+    gloabl_step = -1
+    tokens_seen = 0
     # Iterate over the books in the training corpus
     for index, file_path in tqdm(enumerate(all_files)):
         text_data = read_text_file(file_path) + " <|endoftext|> "
@@ -427,7 +610,7 @@ if __name__ == "__main__":
             )
 
         # Train model on file
-        train_losses, val_losses, tokens_seen, gloabl_step = train(
+        tokens_seen, gloabl_step = train(
             model, 
             optimizer,
             train_loader, 
