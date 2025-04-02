@@ -6,7 +6,7 @@
 import tiktoken
 import torch
 import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import DataLoader, Dataset
 
 
 class GPTDatasetV1(Dataset):
@@ -19,8 +19,8 @@ class GPTDatasetV1(Dataset):
 
         # Use a sliding window to chunk the book into overlapping sequences of max_length
         for i in range(0, len(token_ids) - max_length, stride):
-            input_chunk = token_ids[i:i + max_length]
-            target_chunk = token_ids[i + 1: i + max_length + 1]
+            input_chunk = token_ids[i : i + max_length]
+            target_chunk = token_ids[i + 1 : i + max_length + 1]
             self.input_ids.append(torch.tensor(input_chunk))
             self.target_ids.append(torch.tensor(target_chunk))
 
@@ -31,8 +31,7 @@ class GPTDatasetV1(Dataset):
         return self.input_ids[idx], self.target_ids[idx]
 
 
-def create_dataloader_v1(txt, batch_size=4, max_length=256,
-                         stride=128, shuffle=True, drop_last=True, num_workers=0):
+def create_dataloader_v1(txt, batch_size=4, max_length=256, stride=128, shuffle=True, drop_last=True, num_workers=0):
     # Initialize the tokenizer
     tokenizer = tiktoken.get_encoding("gpt2")
 
@@ -41,7 +40,12 @@ def create_dataloader_v1(txt, batch_size=4, max_length=256,
 
     # Create dataloader
     dataloader = DataLoader(
-        dataset, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last, num_workers=num_workers)
+        dataset,
+        batch_size=batch_size,
+        shuffle=shuffle,
+        drop_last=drop_last,
+        num_workers=num_workers,
+    )
 
     return dataloader
 
@@ -60,7 +64,7 @@ class MultiHeadAttention(nn.Module):
         self.W_value = nn.Linear(d_in, d_out, bias=qkv_bias)
         self.out_proj = nn.Linear(d_out, d_out)  # Linear layer to combine head outputs
         self.dropout = nn.Dropout(dropout)
-        self.register_buffer('mask', torch.triu(torch.ones(context_length, context_length), diagonal=1))
+        self.register_buffer("mask", torch.triu(torch.ones(context_length, context_length), diagonal=1))
 
     def forward(self, x):
         b, num_tokens, d_in = x.shape
@@ -89,7 +93,7 @@ class MultiHeadAttention(nn.Module):
         # Use the mask to fill attention scores
         attn_scores.masked_fill_(mask_bool, -torch.inf)
 
-        attn_weights = torch.softmax(attn_scores / keys.shape[-1]**0.5, dim=-1)
+        attn_weights = torch.softmax(attn_scores / keys.shape[-1] ** 0.5, dim=-1)
         attn_weights = self.dropout(attn_weights)
 
         # Shape: (b, num_tokens, num_heads, head_dim)

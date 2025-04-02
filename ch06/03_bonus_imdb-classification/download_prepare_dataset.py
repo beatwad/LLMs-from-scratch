@@ -8,6 +8,7 @@ import sys
 import tarfile
 import time
 import urllib.request
+
 import pandas as pd
 
 
@@ -21,10 +22,7 @@ def reporthook(count, block_size, total_size):
         percent = count * block_size * 100 / total_size
 
         speed = int(progress_size / (1024 * duration)) if duration else 0
-        sys.stdout.write(
-            f"\r{int(percent)}% | {progress_size / (1024**2):.2f} MB "
-            f"| {speed:.2f} MB/s | {duration:.2f} sec elapsed"
-        )
+        sys.stdout.write(f"\r{int(percent)}% | {progress_size / (1024**2):.2f} MB " f"| {speed:.2f} MB/s | {duration:.2f} sec elapsed")
         sys.stdout.flush()
 
 

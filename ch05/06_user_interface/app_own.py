@@ -3,19 +3,13 @@
 #   - https://www.manning.com/books/build-a-large-language-model-from-scratch
 # Code: https://github.com/rasbt/LLMs-from-scratch
 
-from pathlib import Path
 import sys
+from pathlib import Path
 
+import chainlit
 import tiktoken
 import torch
-import chainlit
-
-from previous_chapters import (
-    generate,
-    GPTModel,
-    text_to_token_ids,
-    token_ids_to_text,
-)
+from previous_chapters import GPTModel, generate, text_to_token_ids, token_ids_to_text
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -27,13 +21,13 @@ def get_model_and_tokenizer():
     """
 
     GPT_CONFIG_124M = {
-        "vocab_size": 50257,    # Vocabulary size
+        "vocab_size": 50257,  # Vocabulary size
         "context_length": 256,  # Shortened context length (orig: 1024)
-        "emb_dim": 768,         # Embedding dimension
-        "n_heads": 12,          # Number of attention heads
-        "n_layers": 12,         # Number of layers
-        "drop_rate": 0.1,       # Dropout rate
-        "qkv_bias": False       # Query-key-value bias
+        "emb_dim": 768,  # Embedding dimension
+        "n_heads": 12,  # Number of attention heads
+        "n_layers": 12,  # Number of layers
+        "drop_rate": 0.1,  # Dropout rate
+        "qkv_bias": False,  # Query-key-value bias
     }
 
     tokenizer = tiktoken.get_encoding("gpt2")
@@ -66,7 +60,7 @@ async def main(message: chainlit.Message):
         max_new_tokens=50,
         context_size=model_config["context_length"],
         top_k=1,
-        temperature=0.0
+        temperature=0.0,
     )
 
     text = token_ids_to_text(token_ids, tokenizer)

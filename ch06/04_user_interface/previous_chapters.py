@@ -34,7 +34,7 @@ class MultiHeadAttention(nn.Module):
         self.W_value = nn.Linear(d_in, d_out, bias=qkv_bias)
         self.out_proj = nn.Linear(d_out, d_out)  # Linear layer to combine head outputs
         self.dropout = nn.Dropout(dropout)
-        self.register_buffer('mask', torch.triu(torch.ones(context_length, context_length), diagonal=1))
+        self.register_buffer("mask", torch.triu(torch.ones(context_length, context_length), diagonal=1))
 
     def forward(self, x):
         b, num_tokens, d_in = x.shape
@@ -63,7 +63,7 @@ class MultiHeadAttention(nn.Module):
         # Use the mask to fill attention scores
         attn_scores.masked_fill_(mask_bool, -torch.inf)
 
-        attn_weights = torch.softmax(attn_scores / keys.shape[-1]**0.5, dim=-1)
+        attn_weights = torch.softmax(attn_scores / keys.shape[-1] ** 0.5, dim=-1)
         attn_weights = self.dropout(attn_weights)
 
         # Shape: (b, num_tokens, num_heads, head_dim)
@@ -98,10 +98,7 @@ class GELU(nn.Module):
         super().__init__()
 
     def forward(self, x):
-        return 0.5 * x * (1 + torch.tanh(
-            torch.sqrt(torch.tensor(2.0 / torch.pi)) *
-            (x + 0.044715 * torch.pow(x, 3))
-        ))
+        return 0.5 * x * (1 + torch.tanh(torch.sqrt(torch.tensor(2.0 / torch.pi)) * (x + 0.044715 * torch.pow(x, 3))))
 
 
 class FeedForward(nn.Module):
@@ -126,7 +123,8 @@ class TransformerBlock(nn.Module):
             context_length=cfg["context_length"],
             num_heads=cfg["n_heads"],
             dropout=cfg["drop_rate"],
-            qkv_bias=cfg["qkv_bias"])
+            qkv_bias=cfg["qkv_bias"],
+        )
         self.ff = FeedForward(cfg)
         self.norm1 = LayerNorm(cfg["emb_dim"])
         self.norm2 = LayerNorm(cfg["emb_dim"])
@@ -136,7 +134,7 @@ class TransformerBlock(nn.Module):
         # Shortcut connection for attention block
         shortcut = x
         x = self.norm1(x)
-        x = self.att(x)   # Shape [batch_size, num_tokens, emb_size]
+        x = self.att(x)  # Shape [batch_size, num_tokens, emb_size]
         x = self.drop_shortcut(x)
         x = x + shortcut  # Add the original input back
 
@@ -157,8 +155,7 @@ class GPTModel(nn.Module):
         self.pos_emb = nn.Embedding(cfg["context_length"], cfg["emb_dim"])
         self.drop_emb = nn.Dropout(cfg["drop_rate"])
 
-        self.trf_blocks = nn.Sequential(
-            *[TransformerBlock(cfg) for _ in range(cfg["n_layers"])])
+        self.trf_blocks = nn.Sequential(*[TransformerBlock(cfg) for _ in range(cfg["n_layers"])])
 
         self.final_norm = LayerNorm(cfg["emb_dim"])
         self.out_head = nn.Linear(cfg["emb_dim"], cfg["vocab_size"], bias=False)
@@ -199,9 +196,13 @@ def download_and_load_gpt2(model_size, models_dir):
     model_dir = os.path.join(models_dir, model_size)
     base_url = "https://openaipublic.blob.core.windows.net/gpt-2/models"
     filenames = [
-        "checkpoint", "encoder.json", "hparams.json",
-        "model.ckpt.data-00000-of-00001", "model.ckpt.index",
-        "model.ckpt.meta", "vocab.bpe"
+        "checkpoint",
+        "encoder.json",
+        "hparams.json",
+        "model.ckpt.data-00000-of-00001",
+        "model.ckpt.index",
+        "model.ckpt.meta",
+        "vocab.bpe",
     ]
 
     # Download files
@@ -285,60 +286,32 @@ def assign(left, right):
 
 
 def load_weights_into_gpt(gpt, params):
-    gpt.pos_emb.weight = assign(gpt.pos_emb.weight, params['wpe'])
-    gpt.tok_emb.weight = assign(gpt.tok_emb.weight, params['wte'])
+    gpt.pos_emb.weight = assign(gpt.pos_emb.weight, params["wpe"])
+    gpt.tok_emb.weight = assign(gpt.tok_emb.weight, params["wte"])
 
     for b in range(len(params["blocks"])):
-        q_w, k_w, v_w = np.split(
-            (params["blocks"][b]["attn"]["c_attn"])["w"], 3, axis=-1)
-        gpt.trf_blocks[b].att.W_query.weight = assign(
-            gpt.trf_blocks[b].att.W_query.weight, q_w.T)
-        gpt.trf_blocks[b].att.W_key.weight = assign(
-            gpt.trf_blocks[b].att.W_key.weight, k_w.T)
-        gpt.trf_blocks[b].att.W_value.weight = assign(
-            gpt.trf_blocks[b].att.W_value.weight, v_w.T)
+        q_w, k_w, v_w = np.split((params["blocks"][b]["attn"]["c_attn"])["w"], 3, axis=-1)
+        gpt.trf_blocks[b].att.W_query.weight = assign(gpt.trf_blocks[b].att.W_query.weight, q_w.T)
+        gpt.trf_blocks[b].att.W_key.weight = assign(gpt.trf_blocks[b].att.W_key.weight, k_w.T)
+        gpt.trf_blocks[b].att.W_value.weight = assign(gpt.trf_blocks[b].att.W_value.weight, v_w.T)
 
-        q_b, k_b, v_b = np.split(
-            (params["blocks"][b]["attn"]["c_attn"])["b"], 3, axis=-1)
-        gpt.trf_blocks[b].att.W_query.bias = assign(
-            gpt.trf_blocks[b].att.W_query.bias, q_b)
-        gpt.trf_blocks[b].att.W_key.bias = assign(
-            gpt.trf_blocks[b].att.W_key.bias, k_b)
-        gpt.trf_blocks[b].att.W_value.bias = assign(
-            gpt.trf_blocks[b].att.W_value.bias, v_b)
+        q_b, k_b, v_b = np.split((params["blocks"][b]["attn"]["c_attn"])["b"], 3, axis=-1)
+        gpt.trf_blocks[b].att.W_query.bias = assign(gpt.trf_blocks[b].att.W_query.bias, q_b)
+        gpt.trf_blocks[b].att.W_key.bias = assign(gpt.trf_blocks[b].att.W_key.bias, k_b)
+        gpt.trf_blocks[b].att.W_value.bias = assign(gpt.trf_blocks[b].att.W_value.bias, v_b)
 
-        gpt.trf_blocks[b].att.out_proj.weight = assign(
-            gpt.trf_blocks[b].att.out_proj.weight,
-            params["blocks"][b]["attn"]["c_proj"]["w"].T)
-        gpt.trf_blocks[b].att.out_proj.bias = assign(
-            gpt.trf_blocks[b].att.out_proj.bias,
-            params["blocks"][b]["attn"]["c_proj"]["b"])
+        gpt.trf_blocks[b].att.out_proj.weight = assign(gpt.trf_blocks[b].att.out_proj.weight, params["blocks"][b]["attn"]["c_proj"]["w"].T)
+        gpt.trf_blocks[b].att.out_proj.bias = assign(gpt.trf_blocks[b].att.out_proj.bias, params["blocks"][b]["attn"]["c_proj"]["b"])
 
-        gpt.trf_blocks[b].ff.layers[0].weight = assign(
-            gpt.trf_blocks[b].ff.layers[0].weight,
-            params["blocks"][b]["mlp"]["c_fc"]["w"].T)
-        gpt.trf_blocks[b].ff.layers[0].bias = assign(
-            gpt.trf_blocks[b].ff.layers[0].bias,
-            params["blocks"][b]["mlp"]["c_fc"]["b"])
-        gpt.trf_blocks[b].ff.layers[2].weight = assign(
-            gpt.trf_blocks[b].ff.layers[2].weight,
-            params["blocks"][b]["mlp"]["c_proj"]["w"].T)
-        gpt.trf_blocks[b].ff.layers[2].bias = assign(
-            gpt.trf_blocks[b].ff.layers[2].bias,
-            params["blocks"][b]["mlp"]["c_proj"]["b"])
+        gpt.trf_blocks[b].ff.layers[0].weight = assign(gpt.trf_blocks[b].ff.layers[0].weight, params["blocks"][b]["mlp"]["c_fc"]["w"].T)
+        gpt.trf_blocks[b].ff.layers[0].bias = assign(gpt.trf_blocks[b].ff.layers[0].bias, params["blocks"][b]["mlp"]["c_fc"]["b"])
+        gpt.trf_blocks[b].ff.layers[2].weight = assign(gpt.trf_blocks[b].ff.layers[2].weight, params["blocks"][b]["mlp"]["c_proj"]["w"].T)
+        gpt.trf_blocks[b].ff.layers[2].bias = assign(gpt.trf_blocks[b].ff.layers[2].bias, params["blocks"][b]["mlp"]["c_proj"]["b"])
 
-        gpt.trf_blocks[b].norm1.scale = assign(
-            gpt.trf_blocks[b].norm1.scale,
-            params["blocks"][b]["ln_1"]["g"])
-        gpt.trf_blocks[b].norm1.shift = assign(
-            gpt.trf_blocks[b].norm1.shift,
-            params["blocks"][b]["ln_1"]["b"])
-        gpt.trf_blocks[b].norm2.scale = assign(
-            gpt.trf_blocks[b].norm2.scale,
-            params["blocks"][b]["ln_2"]["g"])
-        gpt.trf_blocks[b].norm2.shift = assign(
-            gpt.trf_blocks[b].norm2.shift,
-            params["blocks"][b]["ln_2"]["b"])
+        gpt.trf_blocks[b].norm1.scale = assign(gpt.trf_blocks[b].norm1.scale, params["blocks"][b]["ln_1"]["g"])
+        gpt.trf_blocks[b].norm1.shift = assign(gpt.trf_blocks[b].norm1.shift, params["blocks"][b]["ln_1"]["b"])
+        gpt.trf_blocks[b].norm2.scale = assign(gpt.trf_blocks[b].norm2.scale, params["blocks"][b]["ln_2"]["g"])
+        gpt.trf_blocks[b].norm2.shift = assign(gpt.trf_blocks[b].norm2.shift, params["blocks"][b]["ln_2"]["b"])
 
     gpt.final_norm.scale = assign(gpt.final_norm.scale, params["g"])
     gpt.final_norm.shift = assign(gpt.final_norm.shift, params["b"])
@@ -356,7 +329,7 @@ def classify_review(text, model, tokenizer, device, max_length=None, pad_token_i
     supported_context_length = model.pos_emb.weight.shape[0]
 
     # Truncate sequences if they too long
-    input_ids = input_ids[:min(max_length, supported_context_length)]
+    input_ids = input_ids[: min(max_length, supported_context_length)]
 
     # Pad sequences to the longest sequence
     input_ids += [pad_token_id] * (max_length - len(input_ids))

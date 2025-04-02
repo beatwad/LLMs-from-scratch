@@ -5,33 +5,33 @@
 #
 # Code to run the exercises; see exercise-solutions.ipynb for more information
 
-from functools import partial
-from importlib.metadata import version
 import json
 import math
 import os
 import re
 import time
 import urllib
+from functools import partial
+from importlib.metadata import version
 
 import matplotlib.pyplot as plt
-from matplotlib.ticker import MaxNLocator
 import tiktoken
 import torch
-from torch.utils.data import Dataset, DataLoader
-from tqdm import tqdm
 
 # Import from local files in this folder
 from gpt_download import download_and_load_gpt2
+from matplotlib.ticker import MaxNLocator
 from previous_chapters import (
+    GPTModel,
     calc_loss_loader,
     generate,
-    GPTModel,
     load_weights_into_gpt,
     text_to_token_ids,
+    token_ids_to_text,
     train_model_simple,
-    token_ids_to_text
 )
+from torch.utils.data import DataLoader, Dataset
+from tqdm import tqdm
 
 
 class InstructionDataset(Dataset):
@@ -44,9 +44,7 @@ class InstructionDataset(Dataset):
             instruction_plus_input = format_input(entry)
             response_text = f"\n\n### Response:\n{entry['output']}"
             full_text = instruction_plus_input + response_text
-            self.encoded_texts.append(
-                tokenizer.encode(full_text)
-            )
+            self.encoded_texts.append(tokenizer.encode(full_text))
 
     def __getitem__(self, index):
         return self.encoded_texts[index]
@@ -68,9 +66,7 @@ class InstructionDatasetWithMasking(Dataset):
             response_text = f"\n\n### Response:\n{entry['output']}"
             full_text = instruction_plus_input + response_text
 
-            self.encoded_texts.append(
-                tokenizer.encode(full_text)
-            )
+            self.encoded_texts.append(tokenizer.encode(full_text))
 
             # New: collect instruction lengths
             instruction_length = len(tokenizer.encode(instruction_plus_input))
@@ -91,16 +87,13 @@ class InstructionDatasetPhi(Dataset):
         # Pre-tokenize texts
         self.encoded_texts = []
         for entry in data:
-
             ###################################################################
             # NEW: Use `format_input_phi` and adjust the response text template
             instruction_plus_input = format_input_phi(entry)
             response_text = f"\n<|assistant|>:\n{entry['output']}"
             ###################################################################
             full_text = instruction_plus_input + response_text
-            self.encoded_texts.append(
-                tokenizer.encode(full_text)
-            )
+            self.encoded_texts.append(tokenizer.encode(full_text))
 
     def __getitem__(self, index):
         return self.encoded_texts[index]
@@ -113,9 +106,7 @@ class LinearWithLoRA(torch.nn.Module):
     def __init__(self, linear, rank, alpha):
         super().__init__()
         self.linear = linear
-        self.lora = LoRALayer(
-            linear.in_features, linear.out_features, rank, alpha
-        )
+        self.lora = LoRALayer(linear.in_features, linear.out_features, rank, alpha)
 
     def forward(self, x):
         return self.linear(x) + self.lora(x)
@@ -144,15 +135,9 @@ def replace_linear_with_lora(model, rank, alpha):
             replace_linear_with_lora(module, rank, alpha)
 
 
-def custom_collate_fn(
-    batch,
-    pad_token_id=50256,
-    ignore_index=-100,
-    allowed_max_length=None,
-    device="cpu"
-):
+def custom_collate_fn(batch, pad_token_id=50256, ignore_index=-100, allowed_max_length=None, device="cpu"):
     # Find the longest sequence in the batch
-    batch_max_length = max(len(item)+1 for item in batch)
+    batch_max_length = max(len(item) + 1 for item in batch)
 
     # Pad and prepare inputs and targets
     inputs_lst, targets_lst = [], []
@@ -187,15 +172,9 @@ def custom_collate_fn(
     return inputs_tensor, targets_tensor
 
 
-def custom_collate_with_masking_fn(
-    batch,
-    pad_token_id=50256,
-    ignore_index=-100,
-    allowed_max_length=None,
-    device="cpu"
-):
+def custom_collate_with_masking_fn(batch, pad_token_id=50256, ignore_index=-100, allowed_max_length=None, device="cpu"):
     # Find the longest sequence in the batch
-    batch_max_length = max(len(item)+1 for instruction_length, item in batch)   # New: batch is now a tuple
+    batch_max_length = max(len(item) + 1 for instruction_length, item in batch)  # New: batch is now a tuple
 
     # Pad and prepare inputs and targets
     inputs_lst, targets_lst = [], []
@@ -216,7 +195,7 @@ def custom_collate_with_masking_fn(
             targets[indices[1:]] = ignore_index
 
         # New: Mask all input and instruction tokens in the targets
-        targets[:instruction_length-1] = -100
+        targets[: instruction_length - 1] = -100
 
         # Optionally truncate to maximum sequence length
         if allowed_max_length is not None:
@@ -234,7 +213,6 @@ def custom_collate_with_masking_fn(
 
 
 def download_and_load_file(file_path, url):
-
     if not os.path.exists(file_path):
         with urllib.request.urlopen(url) as response:
             text_data = response.read().decode("utf-8")
@@ -251,9 +229,7 @@ def download_and_load_file(file_path, url):
 
 
 def format_input_phi(entry):
-    instruction_text = (
-        f"<|user|>\n{entry['instruction']}"
-    )
+    instruction_text = f"<|user|>\n{entry['instruction']}"
 
     input_text = f"\n{entry['input']}" if entry["input"] else ""
 
@@ -301,14 +277,14 @@ def main(mask_instructions=False, alpaca52k=False, phi3_prompt=False, lora=False
     print()
     pkgs = [
         "matplotlib",  # Plotting library
-        "tiktoken",    # Tokenizer
-        "torch",       # Deep learning library
-        "tqdm",        # Progress bar
+        "tiktoken",  # Tokenizer
+        "torch",  # Deep learning library
+        "tqdm",  # Progress bar
         "tensorflow",  # For OpenAI's pretrained weights
     ]
     for p in pkgs:
         print(f"{p} version: {version(p)}")
-    print(50*"-")
+    print(50 * "-")
 
     #######################################
     # Download and prepare dataset
@@ -322,21 +298,21 @@ def main(mask_instructions=False, alpaca52k=False, phi3_prompt=False, lora=False
     data = download_and_load_file(file_path, url)
 
     train_portion = int(len(data) * 0.85)  # 85% for training
-    test_portion = int(len(data) * 0.1)    # 10% for testing
+    test_portion = int(len(data) * 0.1)  # 10% for testing
 
     train_data = data[:train_portion]
-    test_data = data[train_portion:train_portion + test_portion]
-    val_data = data[train_portion + test_portion:]
+    test_data = data[train_portion : train_portion + test_portion]
+    val_data = data[train_portion + test_portion :]
 
     print("Training set length:", len(train_data))
     print("Validation set length:", len(val_data))
     print("Test set length:", len(test_data))
-    print(50*"-")
+    print(50 * "-")
 
     tokenizer = tiktoken.get_encoding("gpt2")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Device:", device)
-    print(50*"-")
+    print(50 * "-")
 
     if alpaca52k:
         allowed_max_length = 512
@@ -372,7 +348,7 @@ def main(mask_instructions=False, alpaca52k=False, phi3_prompt=False, lora=False
         collate_fn=customized_collate_fn,
         shuffle=True,
         drop_last=True,
-        num_workers=num_workers
+        num_workers=num_workers,
     )
 
     val_dataset = CustomDataset(val_data, tokenizer)
@@ -382,17 +358,17 @@ def main(mask_instructions=False, alpaca52k=False, phi3_prompt=False, lora=False
         collate_fn=customized_collate_fn,
         shuffle=False,
         drop_last=False,
-        num_workers=num_workers
+        num_workers=num_workers,
     )
 
     #######################################
     # Load pretrained model
     #######################################
     BASE_CONFIG = {
-        "vocab_size": 50257,     # Vocabulary size
+        "vocab_size": 50257,  # Vocabulary size
         "context_length": 1024,  # Context length
-        "drop_rate": 0.0,        # Dropout rate
-        "qkv_bias": True         # Query-key-value bias
+        "drop_rate": 0.0,  # Dropout rate
+        "qkv_bias": True,  # Query-key-value bias
     }
 
     model_configs = {
@@ -415,7 +391,7 @@ def main(mask_instructions=False, alpaca52k=False, phi3_prompt=False, lora=False
     model.to(device)
 
     print("Loaded model:", CHOOSE_MODEL)
-    print(50*"-")
+    print(50 * "-")
 
     if lora:
         total_params = sum(p.numel() for p in model.parameters() if p.requires_grad)
@@ -453,9 +429,16 @@ def main(mask_instructions=False, alpaca52k=False, phi3_prompt=False, lora=False
     start_context = format_input_phi(val_data[0]) if phi3_prompt else format_input(val_data[0])
 
     train_losses, val_losses, tokens_seen = train_model_simple(
-        model, train_loader, val_loader, optimizer, device,
-        num_epochs=num_epochs, eval_freq=5, eval_iter=5,
-        start_context=start_context, tokenizer=tokenizer
+        model,
+        train_loader,
+        val_loader,
+        optimizer,
+        device,
+        num_epochs=num_epochs,
+        eval_freq=5,
+        eval_iter=5,
+        start_context=start_context,
+        tokenizer=tokenizer,
     )
 
     end_time = time.time()
@@ -477,14 +460,13 @@ def main(mask_instructions=False, alpaca52k=False, phi3_prompt=False, lora=False
         plot_name = plot_name.replace(".pdf", "-baseline.pdf")
 
     plot_losses(epochs_tensor, tokens_seen, train_losses, val_losses, plot_name)
-    print(50*"-")
+    print(50 * "-")
 
     #######################################
     # Saving results
     #######################################
     print("Generating responses")
     for i, entry in tqdm(enumerate(test_data), total=len(test_data)):
-
         input_text = format_input_phi(entry) if phi3_prompt else format_input(entry)
 
         token_ids = generate(
@@ -492,14 +474,14 @@ def main(mask_instructions=False, alpaca52k=False, phi3_prompt=False, lora=False
             idx=text_to_token_ids(input_text, tokenizer).to(device),
             max_new_tokens=256,
             context_size=BASE_CONFIG["context_length"],
-            eos_id=50256
+            eos_id=50256,
         )
         generated_text = token_ids_to_text(token_ids, tokenizer)
 
         if phi3_prompt:
-            response_text = generated_text[len(input_text):].replace("<|assistant|>:", "").strip()
+            response_text = generated_text[len(input_text) :].replace("<|assistant|>:", "").strip()
         else:
-            response_text = generated_text[len(input_text):].replace("### Response:", "").strip()
+            response_text = generated_text[len(input_text) :].replace("### Response:", "").strip()
 
         test_data[i]["model_response"] = response_text
 
@@ -531,20 +513,15 @@ def main(mask_instructions=False, alpaca52k=False, phi3_prompt=False, lora=False
 
 
 if __name__ == "__main__":
-
     import argparse
 
-    parser = argparse.ArgumentParser(
-        description="Instruction finetune a GPT model"
-    )
+    parser = argparse.ArgumentParser(description="Instruction finetune a GPT model")
     options = {"baseline", "mask_instructions", "alpaca_52k", "phi3_prompt", "lora"}
     parser.add_argument(
         "--exercise_solution",
         type=str,
         default="baseline",
-        help=(
-            f"Which experiment to run. Options: {options}."
-        )
+        help=(f"Which experiment to run. Options: {options}."),
     )
     args = parser.parse_args()
 

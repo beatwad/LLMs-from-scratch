@@ -6,23 +6,22 @@
 # A minimal instruction finetuning file based on the code in chapter 7
 
 import json
+import urllib.request
+
 import psutil
 from tqdm import tqdm
-import urllib.request
 
 
 def query_model(prompt, model="llama3", url="http://localhost:11434/api/chat"):
     # Create the data payload as a dictionary
     data = {
         "model": model,
-        "messages": [
-            {"role": "user", "content": prompt}
-        ],
-        "options": {     # Settings below are required for deterministic responses
+        "messages": [{"role": "user", "content": prompt}],
+        "options": {  # Settings below are required for deterministic responses
             "seed": 123,
             "temperature": 0,
-            "num_ctx": 2048
-        }
+            "num_ctx": 2048,
+        },
     }
 
     # Convert the dictionary to a JSON formatted string and encode it to bytes
@@ -107,19 +106,13 @@ def generate_model_scores(json_data, json_key, model="llama3"):
 
 
 if __name__ == "__main__":
-
     import argparse
 
-    parser = argparse.ArgumentParser(
-        description="Evaluate model responses with ollama"
-    )
+    parser = argparse.ArgumentParser(description="Evaluate model responses with ollama")
     parser.add_argument(
         "--file_path",
         required=True,
-        help=(
-            "The path to the test dataset `.json` file with the"
-            " `'output'` and `'model_response'` keys"
-        )
+        help=("The path to the test dataset `.json` file with the" " `'output'` and `'model_response'` keys"),
     )
     args = parser.parse_args()
 

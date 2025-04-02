@@ -9,10 +9,10 @@ import time
 import urllib.request
 
 import matplotlib.pyplot as plt
+import tiktoken
 import torch
 import torch.nn as nn
-from torch.utils.data import Dataset, DataLoader
-import tiktoken
+from torch.utils.data import DataLoader, Dataset
 
 #####################################
 # Chapter 2
@@ -29,8 +29,8 @@ class GPTDatasetV1(Dataset):
 
         # Use a sliding window to chunk the book into overlapping sequences of max_length
         for i in range(0, len(token_ids) - max_length, stride):
-            input_chunk = token_ids[i:i + max_length]
-            target_chunk = token_ids[i + 1: i + max_length + 1]
+            input_chunk = token_ids[i : i + max_length]
+            target_chunk = token_ids[i + 1 : i + max_length + 1]
             self.input_ids.append(torch.tensor(input_chunk))
             self.target_ids.append(torch.tensor(target_chunk))
 
@@ -41,8 +41,7 @@ class GPTDatasetV1(Dataset):
         return self.input_ids[idx], self.target_ids[idx]
 
 
-def create_dataloader_v1(txt, batch_size=4, max_length=256,
-                         stride=128, shuffle=True, drop_last=True, num_workers=0):
+def create_dataloader_v1(txt, batch_size=4, max_length=256, stride=128, shuffle=True, drop_last=True, num_workers=0):
     # Initialize the tokenizer
     tokenizer = tiktoken.get_encoding("gpt2")
 
@@ -51,8 +50,12 @@ def create_dataloader_v1(txt, batch_size=4, max_length=256,
 
     # Create dataloader
     dataloader = DataLoader(
-        dataset, batch_size=batch_size, shuffle=shuffle, drop_last=drop_last, num_workers=num_workers,
-        pin_memory=True
+        dataset,
+        batch_size=batch_size,
+        shuffle=shuffle,
+        drop_last=drop_last,
+        num_workers=num_workers,
+        pin_memory=True,
     )
 
     return dataloader
@@ -90,10 +93,11 @@ class PyTorchMultiHeadAttention(nn.Module):
         # (3, b, num_heads, num_tokens, head_dim) -> 3 times (b, num_heads, num_tokens, head_dim)
         queries, keys, values = qkv
 
-        use_dropout = 0. if not self.training else self.dropout
+        use_dropout = 0.0 if not self.training else self.dropout
 
         context_vec = nn.functional.scaled_dot_product_attention(
-            queries, keys, values, attn_mask=None, dropout_p=use_dropout, is_causal=True)
+            queries, keys, values, attn_mask=None, dropout_p=use_dropout, is_causal=True
+        )
 
         # Combine heads, where self.d_out = self.num_heads * self.head_dim
         context_vec = context_vec.transpose(1, 2).contiguous().view(batch_size, num_tokens, self.d_out)
@@ -129,7 +133,8 @@ class TransformerBlock(nn.Module):
             d_out=cfg["emb_dim"],
             num_heads=cfg["n_heads"],
             dropout=cfg["drop_rate"],
-            qkv_bias=cfg["qkv_bias"])
+            qkv_bias=cfg["qkv_bias"],
+        )
         self.ff = FeedForward(cfg)
         self.norm1 = nn.LayerNorm(cfg["emb_dim"])
         self.norm2 = nn.LayerNorm(cfg["emb_dim"])
@@ -139,7 +144,7 @@ class TransformerBlock(nn.Module):
         # Shortcut connection for attention block
         shortcut = x
         x = self.norm1(x)
-        x = self.att(x)   # Shape [batch_size, num_tokens, emb_size]
+        x = self.att(x)  # Shape [batch_size, num_tokens, emb_size]
         x = self.drop_shortcut(x)
         x = x + shortcut  # Add the original input back
 
@@ -160,8 +165,7 @@ class GPTModel(nn.Module):
         self.pos_emb = nn.Embedding(cfg["context_length"], cfg["emb_dim"])
         self.drop_emb = nn.Dropout(cfg["drop_rate"])
 
-        self.trf_blocks = nn.Sequential(
-            *[TransformerBlock(cfg) for _ in range(cfg["n_layers"])])
+        self.trf_blocks = nn.Sequential(*[TransformerBlock(cfg) for _ in range(cfg["n_layers"])])
 
         self.final_norm = nn.LayerNorm(cfg["emb_dim"])
         self.out_head = nn.Linear(cfg["emb_dim"], cfg["vocab_size"], bias=False)
@@ -181,7 +185,6 @@ class GPTModel(nn.Module):
 def generate_text_simple(model, idx, max_new_tokens, context_size):
     # idx is (B, T) array of indices in the current context
     for _ in range(max_new_tokens):
-
         # Crop current context if it exceeds the supported context size
         # E.g., if LLM supports only 5 tokens, and the context size is 10
         # then only the last 5 tokens are used as context
@@ -202,6 +205,7 @@ def generate_text_simple(model, idx, max_new_tokens, context_size):
         idx = torch.cat((idx, idx_next), dim=1)  # (batch, n_tokens+1)
 
     return idx
+
 
 #####################################
 # Chapter 5
@@ -227,7 +231,7 @@ def calc_loss_batch(input_batch, target_batch, model, device):
 
 
 def calc_loss_loader(data_loader, model, device, num_batches=None):
-    total_loss = 0.
+    total_loss = 0.0
     if len(data_loader) == 0:
         return float("nan")
     elif num_batches is None:
@@ -257,17 +261,24 @@ def generate_and_print_sample(model, tokenizer, device, start_context):
     context_size = model.pos_emb.weight.shape[0]
     encoded = text_to_token_ids(start_context, tokenizer).to(device)
     with torch.no_grad():
-        token_ids = generate_text_simple(
-            model=model, idx=encoded,
-            max_new_tokens=50, context_size=context_size
-        )
+        token_ids = generate_text_simple(model=model, idx=encoded, max_new_tokens=50, context_size=context_size)
         decoded_text = token_ids_to_text(token_ids, tokenizer)
         print(decoded_text.replace("\n", " "))  # Compact print format
     model.train()
 
 
-def train_model_simple_with_timing(model, train_loader, val_loader, optimizer, device,
-                                   num_epochs, eval_freq, eval_iter, start_context, tokenizer):
+def train_model_simple_with_timing(
+    model,
+    train_loader,
+    val_loader,
+    optimizer,
+    device,
+    num_epochs,
+    eval_freq,
+    eval_iter,
+    start_context,
+    tokenizer,
+):
     train_losses, val_losses, track_tokens = [], [], []
     total_tokens, global_step, last_tokens = 0, -1, 0
 
@@ -280,9 +291,9 @@ def train_model_simple_with_timing(model, train_loader, val_loader, optimizer, d
         t_start = torch.cuda.Event(enable_timing=True)
         t_end = torch.cuda.Event(enable_timing=True)
         torch.cuda.synchronize()  # Ensure all prior CUDA operations are done
-        t_start.record()          # Start the timer for the first interval
+        t_start.record()  # Start the timer for the first interval
     else:
-        t0 = time.time()          # Start the timer for the first interval
+        t0 = time.time()  # Start the timer for the first interval
 
     # Main training loop
     for epoch in range(num_epochs):
@@ -329,9 +340,11 @@ def train_model_simple_with_timing(model, train_loader, val_loader, optimizer, d
                 val_losses.append(val_loss)
                 track_tokens.append(total_tokens)
 
-                print(f"Ep {epoch+1}, Step {global_step:06d}, "
-                      f"Train: {train_loss:.3f}, Val: {val_loss:.3f}, "
-                      f"Step tok/sec: {round(tps)}, Avg tok/sec: {round(avg_tps)}")
+                print(
+                    f"Ep {epoch+1}, Step {global_step:06d}, "
+                    f"Train: {train_loss:.3f}, Val: {val_loss:.3f}, "
+                    f"Step tok/sec: {round(tps)}, Avg tok/sec: {round(avg_tps)}"
+                )
 
         generate_and_print_sample(model, tokenizer, device, start_context)
 
@@ -371,8 +384,8 @@ def plot_losses(epochs_seen, tokens_seen, train_losses, val_losses):
 # Main function calls
 #####################################
 
-def main(gpt_config, settings):
 
+def main(gpt_config, settings):
     torch.manual_seed(123)
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"PyTorch version: {torch.__version__}")
@@ -398,7 +411,7 @@ def main(gpt_config, settings):
 
     if not os.path.exists(file_path):
         with urllib.request.urlopen(url) as response:
-            text_data = response.read().decode('utf-8')
+            text_data = response.read().decode("utf-8")
         with open(file_path, "w", encoding="utf-8") as file:
             file.write(text_data)
     else:
@@ -413,8 +426,10 @@ def main(gpt_config, settings):
     model = torch.compile(model)
     model.to(device).to(torch.bfloat16)
     optimizer = torch.optim.AdamW(
-        model.parameters(), lr=settings["learning_rate"], weight_decay=settings["weight_decay"],
-        fused=True
+        model.parameters(),
+        lr=settings["learning_rate"],
+        weight_decay=settings["weight_decay"],
+        fused=True,
     )
 
     ##############################
@@ -432,7 +447,7 @@ def main(gpt_config, settings):
         stride=gpt_config["context_length"],
         drop_last=True,
         shuffle=True,
-        num_workers=4
+        num_workers=4,
     )
 
     val_loader = create_dataloader_v1(
@@ -442,7 +457,7 @@ def main(gpt_config, settings):
         stride=gpt_config["context_length"],
         drop_last=False,
         shuffle=False,
-        num_workers=4
+        num_workers=4,
     )
 
     ##############################
@@ -461,29 +476,28 @@ def main(gpt_config, settings):
         eval_freq=10,
         eval_iter=1,
         start_context="Every effort moves you",
-        tokenizer=tokenizer
+        tokenizer=tokenizer,
     )
 
     return train_losses, val_losses, tokens_seen, model
 
 
 if __name__ == "__main__":
-
     GPT_CONFIG_124M = {
-        "vocab_size": 50304,     # Vocabulary size
+        "vocab_size": 50304,  # Vocabulary size
         "context_length": 1024,  # Input tokens per training example
-        "emb_dim": 768,          # Embedding dimension
-        "n_heads": 12,           # Number of attention heads
-        "n_layers": 12,          # Number of layers
-        "drop_rate": 0.1,        # Dropout rate
-        "qkv_bias": False        # Query-key-value bias
+        "emb_dim": 768,  # Embedding dimension
+        "n_heads": 12,  # Number of attention heads
+        "n_layers": 12,  # Number of layers
+        "drop_rate": 0.1,  # Dropout rate
+        "qkv_bias": False,  # Query-key-value bias
     }
 
     OTHER_SETTINGS = {
         "learning_rate": 5e-4,
         "num_epochs": 15,
         "batch_size": 32,
-        "weight_decay": 0.1
+        "weight_decay": 0.1,
     }
 
     ###########################

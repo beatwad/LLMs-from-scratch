@@ -23,4 +23,3 @@ The figures below summarize the performance benchmarks (lower is better).
 #### Forward and backward pass after compilation
 
 <a href="mha-implementations.ipynb"><img src="https://sebastianraschka.com/images/LLMs-from-scratch-images/bonus/mha-benchmark/3_forward-and-backward-compiled.webp?1" width="500px"></a>
-

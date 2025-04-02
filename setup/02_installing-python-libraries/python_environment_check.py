@@ -3,13 +3,15 @@
 #   - https://www.manning.com/books/build-a-large-language-model-from-scratch
 # Code: https://github.com/rasbt/LLMs-from-scratch
 
-from importlib.metadata import PackageNotFoundError, import_module, version as get_version
-from os.path import dirname, exists, join, realpath
-from packaging.version import parse as version_parse
-from packaging.requirements import Requirement
-from packaging.specifiers import SpecifierSet
 import platform
 import sys
+from importlib.metadata import PackageNotFoundError, import_module
+from importlib.metadata import version as get_version
+from os.path import dirname, exists, join, realpath
+
+from packaging.requirements import Requirement
+from packaging.specifiers import SpecifierSet
+from packaging.version import parse as version_parse
 
 if version_parse(platform.python_version()) < version_parse("3.9"):
     print("[FAIL] We recommend Python 3.9 or newer but found version %s" % sys.version)
