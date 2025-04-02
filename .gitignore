@@ -301,3 +301,8 @@ cython_debug/
 # pixi environments
 .pixi
 *.egg-info
+
+# Pretrained models and tokenizers
+*tokenizer.model
+*.safetensors
+*.pth
