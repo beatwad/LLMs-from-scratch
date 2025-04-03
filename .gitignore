@@ -126,6 +126,8 @@ my_gpt/gutenberg/
 my_gpt/gutenberg_preprocessed/
 my_gpt/wandb/
 
+finetuned_gpt/data_folder/
+
 # Temporary OS-related files
 .DS_Store
 
