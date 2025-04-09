@@ -7,6 +7,7 @@
 # throughout Chapters 2-4.
 # This file can be run as a standalone script.
 
+import numpy as np
 import tiktoken
 import torch
 import torch.nn as nn
